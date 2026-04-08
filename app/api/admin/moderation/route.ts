@@ -92,8 +92,8 @@ export async function POST(request: Request) {
 
             const inlineKeyboard = {
               inline_keyboard: [[
-                { text: '🛒 Ir al chollo', url: deal.link || platformLink },
-                { text: '🌐 Ver más en CupOferta', url: platformLink }
+                { text: '🛒 Ir a oferta', url: deal.link || platformLink },
+                { text: '🌐 Ver en CupOferta', url: platformLink }
               ]]
             };
 
