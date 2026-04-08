@@ -18,6 +18,7 @@ import { Footer } from '@/components/layout/Footer';
 import { TopDealsWidget } from '@/components/deals/TopDealsWidget';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useUIStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase/client';
 import { BannerAd } from '@/components/ads/BannerAd';
@@ -93,8 +94,36 @@ export default function Home() {
   const [loadingMore, setLoadingMore] = useState(false);
   const PAGE_SIZE = 12;
 
-  const { isDarkMode, setAuthModalOpen, user, setUser, activeFilter, categoryFilter, activeTab, setSearchModalOpen, setNewDealModalOpen, setFiltersModalOpen } = useUIStore();
+  const { isDarkMode, setAuthModalOpen, user, setUser, activeFilter, categoryFilter, activeTab, setSearchModalOpen, setNewDealModalOpen, setFiltersModalOpen, setSelectedDeal, setDrawerMode } = useUIStore();
   const supabase = createClient();
+  const searchParams = useSearchParams();
+
+  // ── Handle URL Deal Parameter ──────────────────────────────
+  useEffect(() => {
+    const dealId = searchParams.get('deal');
+    if (dealId) {
+      const fetchAndOpenDeal = async () => {
+        const { data, error } = await supabase
+          .from('deals')
+          .select('*, profiles!deals_user_id_fkey(username, avatar_url)')
+          .eq('id', dealId)
+          .single();
+        
+        if (data && !error) {
+          setSelectedDeal(data);
+          setDrawerMode('details');
+        }
+      };
+      fetchAndOpenDeal();
+    }
+  }, [searchParams]);
+
+  // ── Auth listener ──────────────────────────────────────────
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user || null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user || null));
+    return () => subscription.unsubscribe();
+  }, []);
 
   const tc = {
     textStrong: isDarkMode ? 'text-white' : 'text-slate-900',

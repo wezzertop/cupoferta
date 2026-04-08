@@ -76,7 +76,8 @@ export async function POST(request: Request) {
             const escapeHtml = (text: string) =>
               String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-            const platformLink = `https://cupoferta.com/deal/${deal.id}`;
+            const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://cupoferta.com';
+            const platformLink = `${siteUrl}/deal/${deal.id}`;
             let message = telConfig.message_template || '🔥 <b>{title}</b>\n💰 {price}€\n\n📌 {store}\n\n<a href="{link}">Ver en tienda</a>';
 
             message = message

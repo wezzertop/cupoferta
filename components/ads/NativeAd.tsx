@@ -6,27 +6,26 @@ export function NativeAd() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Solo ejecutar en el cliente y si el contenedor existe
     if (typeof window !== 'undefined' && containerRef.current) {
-      if (document.getElementById('native-ad-script')) return; // Evitar duplicados
+      // Evitar duplicados si ya hay un script en el contenedor
+      if (containerRef.current.querySelector('script[src*="fc8a8cf35db735c9df6dc87b1ce5c70f"]')) {
+        return;
+      }
 
       const script = document.createElement('script');
-      script.id = 'native-ad-script';
       script.async = true;
-      script.dataset.cfasync = 'false';
+      script.setAttribute('data-cfasync', 'false');
       script.src = 'https://crateworkshop.com/fc8a8cf35db735c9df6dc87b1ce5c70f/invoke.js';
       
-      // Adjuntar el script al DOM
-      document.body.appendChild(script);
-
-      return () => {
-        const existingScript = document.getElementById('native-ad-script');
-        if (existingScript) existingScript.remove();
-      };
+      // Insertar el script en el contenedor
+      containerRef.current.appendChild(script);
     }
   }, []);
 
   return (
-    <div className="w-full flex justify-center items-center overflow-hidden min-h-[250px]">
+    <div ref={containerRef} className="w-full flex justify-center items-center overflow-hidden min-h-[250px]">
+      {/* El script inyectará el anuncio dentro de este div por su ID */}
       <div id="container-fc8a8cf35db735c9df6dc87b1ce5c70f"></div>
     </div>
   );
