@@ -1,0 +1,169 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #ebf0f5;
+    --foreground: #0f172a;
+    --font-heading: 'Plus Jakarta Sans', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    /* Safe areas for mobile browsers (iPhone notch / home indicator) */
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+  }
+  
+  .dark {
+    --background: #0a0a0a;
+    --foreground: #f8fafc;
+  }
+
+  /* Prevent double-tap zoom on mobile */
+  button, a, input, select, textarea {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* Smooth momentum scrolling on iOS */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Better box-sizing globally */
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  /* Prevent iOS font size inflation on rotate */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  h1 { @apply text-h1 font-heading; }
+  h2 { @apply text-h2 font-heading; }
+  h3 { @apply text-h3 font-heading; }
+  h4 { @apply text-h4 font-heading; }
+  body { @apply text-body-base font-body; }
+  p { @apply text-body-base font-body; }
+}
+
+@layer utilities {
+  .font-heading { font-family: var(--font-heading); }
+  .font-body { font-family: var(--font-body); }
+  .font-numbers { font-family: var(--font-heading); font-variant-numeric: tabular-nums; }
+  
+  /* Scrollbars */
+  .hide-scrollbar::-webkit-scrollbar { display: none; }
+  .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  
+  .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0, 158, 168, 0.3); border-radius: 10px; }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(0, 158, 168, 0.6); }
+  
+  /* Interactions */
+  .btn-effect {
+    @apply transition-all duration-200 active:scale-95;
+  }
+
+  /* Safe area padding helpers */
+  .pb-safe { padding-bottom: max(1rem, var(--safe-bottom)); }
+  .pt-safe { padding-top: max(0px, var(--safe-top)); }
+
+  /* Ad banner shimmer animation */
+  .banner-shimmer {
+    background: linear-gradient(90deg, transparent, rgba(0,158,168,0.07), transparent);
+    background-size: 200% 100%;
+    animation: bannerShimmer 3s ease-in-out infinite;
+  }
+
+  @keyframes bannerShimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  /* Animate in for page entering */
+  .animate-in { animation-fill-mode: both; }
+
+  /* Line clamp cross-browser */
+  .line-clamp-1 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; line-clamp: 1; }
+  .line-clamp-2 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+  .line-clamp-3 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; }
+}
+
+/* ==========================================
+   GLOBAL BASE STYLES
+   ========================================== */
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  min-height: 100dvh; /* dynamic viewport height for mobile browsers */
+  overflow-x: hidden;
+}
+
+/* ==========================================
+   RESPONSIVE IMAGE HANDLING
+   ========================================== */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ==========================================
+   FOCUS STYLES (Accessibility + cross-browser)
+   ========================================== */
+:focus-visible {
+  outline: 2px solid #009ea8;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ==========================================
+   MODAL OVERLAY — prevent body scroll on open
+   ========================================== */
+body.modal-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
+
+/* ==========================================
+   AD BANNER BASE STYLES
+   ========================================== */
+.ad-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px dashed rgba(0, 158, 168, 0.3);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.ad-banner:hover {
+  border-color: rgba(0, 158, 168, 0.6);
+  background-color: rgba(0, 158, 168, 0.03);
+}
+
+/* ==========================================
+   DRAWER — smooth on all browsers
+   ========================================== */
+.drawer-panel {
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* ==========================================
+   SELECTION COLORS
+   ========================================== */
+::selection {
+  background-color: rgba(0, 158, 168, 0.2);
+  color: inherit;
+}
