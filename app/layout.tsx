@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Providers } from './providers';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'CupOferta - La comunidad #1 de ahorradores',
   description: 'Nunca más pagues el precio completo.',
