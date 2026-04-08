@@ -146,7 +146,7 @@ export async function POST(request: Request) {
                     telegramForm.append('reply_markup', JSON.stringify(inlineKeyboard));
                     telegramForm.append(
                       'photo',
-                      new Blob([imageBytes], { type: contentType }),
+                      new Blob([imageBytes as any], { type: contentType }),
                       'deal_image.jpg'
                     );
 
