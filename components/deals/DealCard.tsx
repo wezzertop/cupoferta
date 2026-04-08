@@ -3,7 +3,7 @@ import { useUIStore } from '@/lib/store';
 import { ChevronUp, ChevronDown, MessageCircle, Eye, Share2, Bookmark, ExternalLink, Truck, AlertTriangle, Flame, CheckCircle2, Tag, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { getDealImages, getRemainingTime } from '@/lib/utils';
+import { getDealImages, getRemainingTime, formatPrice, getCurrencyFlag, getFlagUrl } from '@/lib/utils';
 
 interface Deal {
   id: string;
@@ -21,6 +21,7 @@ interface Deal {
   link: string;
   created_at: string;
   expires_at: string | null;
+  currency?: string;
   deal_type?: 'offer' | 'coupon';
   coupon_code?: string | null;
   profiles: { username: string; avatar_url: string };
@@ -213,7 +214,7 @@ export function DealCard({ deal, viewMode }: { deal: Deal; viewMode: 'grid' | 'l
           ${isDarkMode ? 'border-white/5 bg-white/5' : 'border-slate-100 bg-white'}
         `}>
           <div className="w-full h-full sm:group-hover/card:scale-105 transition-transform duration-700 bg-white">
-            <img src={dealImages[activeImgIdx]} alt={deal.title} className="w-full h-full object-cover object-center mix-blend-multiply" />
+            <img src={getDealImages(deal.image_url)[activeImgIdx]} alt={deal.title} className="w-full h-full object-cover object-center mix-blend-multiply" />
           </div>
 
           {/* Gallery Arrows */}
@@ -237,6 +238,14 @@ export function DealCard({ deal, viewMode }: { deal: Deal; viewMode: 'grid' | 'l
           )}
           <div className="absolute top-1.5 left-1.5 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 rounded-lg text-[7px] sm:text-[9px] font-heading font-black uppercase tracking-wider text-[#111727] shadow-sm border border-slate-200/60">
             {deal.store}
+          </div>
+          <div className="absolute top-1.5 right-1.5 flex flex-col items-end gap-1">
+            <div className={`bg-white/90 backdrop-blur-sm p-1 rounded-lg shadow-sm border border-slate-200/60 flex items-center justify-center`}>
+              <img src={getFlagUrl(deal.currency)} alt="" className="w-5 h-auto rounded-sm shadow-[0_0_2px_rgba(0,0,0,0.1)]" />
+            </div>
+            <div className={`bg-black/80 backdrop-blur-sm px-1.5 py-0.5 rounded-md text-[8px] font-heading font-black text-white border border-white/10 shadow-lg`}>
+              {deal.currency || 'MXN'}
+            </div>
           </div>
         </div>
 
@@ -293,14 +302,16 @@ export function DealCard({ deal, viewMode }: { deal: Deal; viewMode: 'grid' | 'l
           </div>
 
           {/* Info Badges Row */}
-          <div className="flex items-center gap-2 mb-3 mt-1.5 flex-wrap">
-            <span className={`text-lg sm:text-2xl font-numbers font-black leading-none ${themeClasses.textStrong}`}>
-              ${deal.price.toLocaleString()}
-            </span>
+          <div className={`flex items-center gap-2 mb-3 mt-1.5 flex-wrap`}>
+            <div className="flex items-center gap-1.5">
+              <span className={`text-lg sm:text-2xl font-numbers font-black leading-none ${themeClasses.textStrong}`}>
+                {formatPrice(deal.price, deal.currency)}
+              </span>
+            </div>
             {deal.old_price > deal.price && (
               <>
                 <span className={`text-[10px] sm:text-sm font-numbers font-bold line-through decoration-red-500/50 decoration-2 opacity-60 ${themeClasses.textMuted}`}>
-                  ${deal.old_price.toLocaleString()}
+                  {formatPrice(deal.old_price, deal.currency)}
                 </span>
                 <span className="px-2 py-0.5 rounded-md text-[10px] font-numbers font-extrabold bg-[#facc15] text-[#0a0a0a] shadow-sm shadow-[#facc15]/10">
                   -{discount}%
@@ -363,13 +374,14 @@ export function DealCard({ deal, viewMode }: { deal: Deal; viewMode: 'grid' | 'l
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               className={`
-                text-white px-3 sm:px-5 py-2.5 rounded-xl font-heading font-black text-[10px] sm:text-[12px] flex items-center justify-center gap-2 
+                text-white rounded-xl font-heading font-black text-[10px] sm:text-[12px] flex items-center justify-center gap-2 
                 shadow-lg shadow-[#009ea8]/20 hover:-translate-y-0.5 active:scale-95 transition-all bg-[#009ea8] shrink-0
+                ${viewMode === 'list' ? 'w-10 h-10 sm:w-auto sm:h-auto sm:px-5 sm:py-2.5' : 'px-3 sm:px-5 py-2.5'}
                 ${viewMode === 'grid' ? (deal.deal_type === 'coupon' ? 'flex-1' : 'w-full') : 'ml-2'}
               `}
             >
-              <span>VER OFERTA</span>
-              <ExternalLink className="w-3.5 h-3.5" />
+              <span className={viewMode === 'list' ? 'hidden sm:inline' : ''}>VER OFERTA</span>
+              <ExternalLink className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
             </a>
           </div>
         </div>

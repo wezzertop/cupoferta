@@ -70,3 +70,28 @@ export function getRemainingTime(expiresAt: string | null | undefined): string |
   
   return `Faltan ${minutes}m ${seconds}s`;
 }
+
+export const CURRENCIES = [
+  { code: 'MXN', label: 'Peso Mexicano', symbol: '$', flag: '🇲🇽', country: 'México', iso: 'mx' },
+  { code: 'ARS', label: 'Peso Argentino', symbol: '$', flag: '🇦🇷', country: 'Argentina', iso: 'ar' },
+  { code: 'USD', label: 'Dólar Estadounidense', symbol: '$', flag: '🇺🇸', country: 'EE.UU.', iso: 'us' },
+  { code: 'EUR', label: 'Euro', symbol: '€', flag: '🇪🇺', country: 'Europa', iso: 'eu' },
+  { code: 'CLP', label: 'Peso Chileno', symbol: '$', flag: '🇨🇱', country: 'Chile', iso: 'cl' },
+  { code: 'COP', label: 'Peso Colombiano', symbol: '$', flag: '🇨🇴', country: 'Colombia', iso: 'co' },
+  { code: 'PEN', label: 'Sol Peruano', symbol: 'S/', flag: '🇵🇪', country: 'Perú', iso: 'pe' },
+];
+
+export function formatPrice(price: number, currencyCode: string = 'MXN') {
+  const currency = CURRENCIES.find(c => c.code === currencyCode) || CURRENCIES[0];
+  return `${currency.symbol}${price.toLocaleString()}`;
+}
+
+export function getCurrencyFlag(currencyCode: string = 'MXN') {
+  const currency = CURRENCIES.find(c => c.code === currencyCode);
+  return currency ? currency.flag : '🇲🇽';
+}
+
+export function getFlagUrl(currencyCode: string = 'MXN') {
+  const currency = CURRENCIES.find(c => c.code === currencyCode) || CURRENCIES[0];
+  return `https://flagcdn.com/w40/${currency.iso}.png`;
+}

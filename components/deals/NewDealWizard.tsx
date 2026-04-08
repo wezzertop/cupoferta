@@ -3,6 +3,9 @@ import { useUIStore } from '@/lib/store';
 import { useState, useRef, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { X, ChevronRight, ChevronLeft, Link as LinkIcon, DollarSign, Tag, Image as ImageIcon, Sparkles, Loader2, CheckCircle2, Upload, AlertCircle, Calendar, Search, ChevronDown, Bold, Italic, List, GripHorizontal, ArrowLeft, ArrowRight, Trash2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { getFlagUrl } from '@/lib/utils';
 
 const STORES = ['Amazon', 'Miravia', 'AliExpress', 'El Corte Inglés', 'MediaMarkt', 'PcComponentes', 'Carrefour', 'Decathlon', 'Nike', 'Adidas', 'Zalando', 'eBay', 'Shein', 'Temu', 'Fnac', 'Leroy Merlin', 'IKEA', 'Promofarma', 'Douglas', 'Chollómetro', 'Otra (Solicitar)'];
 const CATEGORIES = ['Electrónica', 'Informática y Redes', 'Videojuegos', 'Hogar y Jardín', 'Salud y Belleza', 'Moda y Accesorios', 'Deportes y Aire Libre', 'Supermercado', 'Motor', 'Viajes', 'Bebés y Niños', 'Mascotas', 'Ocio y Cultura', 'Herramientas y Bricolaje', 'Juguetes', 'Cursos y Software', 'Otra (Solicitar)'];
@@ -59,7 +62,6 @@ function SearchableDropdown({ options, value, onChange, placeholder, icon: Icon,
   );
 }
 
-// Interfaz para la Galería
 type DealImage = { id: string; preview: string; file?: File; isUrl: boolean; };
 
 export function NewDealWizard() {
@@ -72,7 +74,6 @@ export function NewDealWizard() {
   const [isImporting, setIsImporting] = useState(false);
   const [importReport, setImportReport] = useState<any>(null);
   
-  // States
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
   const [store, setStore] = useState('');
@@ -85,6 +86,7 @@ export function NewDealWizard() {
   const [expirationDate, setExpirationDate] = useState('');
   const [dealType, setDealType] = useState<'offer' | 'coupon'>('offer');
   const [couponCode, setCouponCode] = useState('');
+  const [currency, setCurrency] = useState('MXN');
   
   const [images, setImages] = useState<DealImage[]>([]);
   const [tempUrlInput, setTempUrlInput] = useState('');
@@ -96,9 +98,9 @@ export function NewDealWizard() {
 
   if (!newDealModalOpen) return null;
   if (!user && newDealModalOpen) {
-     setNewDealModalOpen(false);
-     setTimeout(() => setAuthModalOpen(true), 100);
-     return null;
+      setNewDealModalOpen(false);
+      setTimeout(() => setAuthModalOpen(true), 100);
+      return null;
   }
 
   const supabase = createClient();
@@ -109,7 +111,7 @@ export function NewDealWizard() {
       setStep(1); setSuccess(false); setErrorMsg(''); setMode('manual'); setImportReport(null);
       setUrl(''); setTitle(''); setStore(''); setPrice(''); setOldPrice(''); 
       setCategory(''); setDescription(''); setImages([]); setTempUrlInput('');
-      setHasExpiration(false); setExpirationDate('');
+      setHasExpiration(false); setExpirationDate(''); setCurrency('MXN');
     }, 300);
   };
 
@@ -150,11 +152,11 @@ export function NewDealWizard() {
         img.onload = () => {
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d')!;
-          const MAX_SIZE = 800; // Calidad Óptima Cuadrada (1:1)
+          const MAX_SIZE = 800;
           canvas.width = MAX_SIZE;
           canvas.height = MAX_SIZE;
           
-          ctx.fillStyle = '#ffffff'; // Relleno blanco para padding
+          ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, MAX_SIZE, MAX_SIZE);
           
           const scale = Math.min(MAX_SIZE / img.width, MAX_SIZE / img.height);
@@ -181,7 +183,6 @@ export function NewDealWizard() {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     
-    // Check space remaining
     const slots = 4 - images.length;
     if (slots <= 0) {
       setErrorMsg("Solo puedes subir un máximo de 4 imágenes.");
@@ -280,15 +281,7 @@ export function NewDealWizard() {
     
     try {
       const finalImageUrls: string[] = [];
-
-      // Las imágenes se guardan directamente:
-      // - Si vienen de URL externa (/api/images/process) → ya son URLs públicas
-      // - Si son archivos locales → se guarda el base64 del canvas (data:image/jpeg;base64,...)
-      //   El servidor de moderación lo decodifica y lo manda a Telegram como archivo binario
       for (const img of images) {
-        // En ambos casos usamos img.preview:
-        //   isUrl=true  → img.preview es la URL de Supabase/CDN procesada
-        //   isUrl=false → img.preview es el data:image/jpeg;base64,... del canvas
         finalImageUrls.push(img.preview);
       }
 
@@ -300,13 +293,14 @@ export function NewDealWizard() {
         old_price: oldPrice ? parseFloat(oldPrice) : null,
         store: store.trim(),
         category: category.trim(),
-        image_url: finalImageUrls, // Guardar directo como Array para text[] / jsonb en la DB
+        currency: currency,
+        image_url: finalImageUrls,
         shipping_type: shippingType,
-        link: url, // Guardar el enlace original
+        link: url,
         expires_at: hasExpiration && expirationDate ? new Date(expirationDate).toISOString() : null,
         deal_type: dealType,
         coupon_code: dealType === 'coupon' ? couponCode : null,
-        status: 'pending' // Forzar moderación
+        status: 'pending'
       };
 
       const { error } = await supabase.from('deals').insert(insertData);
@@ -325,6 +319,7 @@ export function NewDealWizard() {
     inputBg: isDarkMode ? 'bg-[#141414] border-[#333333] text-white focus:border-[#009ea8]' : 'bg-white border-slate-200 text-slate-900 focus:border-[#009ea8] focus:shadow-sm transition-all',
     textMuted: isDarkMode ? 'text-gray-400' : 'text-slate-500',
     textStrong: isDarkMode ? 'text-white' : 'text-slate-900',
+    textDesc: isDarkMode ? 'text-gray-300' : 'text-slate-600',
     avatarBubble: isDarkMode ? 'bg-[#1a1a1a] border-white/5' : 'bg-white border border-slate-100 shadow-xl shadow-slate-200/50',
   };
 
@@ -349,7 +344,6 @@ export function NewDealWizard() {
       
       <div className={`relative w-full max-w-4xl h-[85vh] sm:h-[80vh] min-h-[500px] flex flex-col md:flex-row rounded-3xl shadow-2xl border transition-all transform animate-in fade-in zoom-in-95 duration-300 ${themeClasses.modal} overflow-hidden`}>
         
-        {/* Lado Izquierdo: Avatar */}
         <div className={`w-full md:w-[320px] p-6 lg:p-8 flex flex-col justify-between relative border-b md:border-b-0 md:border-r shrink-0 border-inherit ${isDarkMode ? 'bg-black/40' : 'bg-white shadow-[2px_0_15px_rgba(0,0,0,0.02)]'} overflow-hidden hidden sm:flex z-10`}>
            <div className="absolute top-0 right-0 w-64 h-64 bg-[#009ea8] rounded-full blur-[80px] opacity-10 pointer-events-none -translate-y-1/2 translate-x-1/3"></div>
            <div>
@@ -366,7 +360,6 @@ export function NewDealWizard() {
            </div>
         </div>
 
-        {/* Formulario Lateral Derecho */}
         <div className={`flex-1 flex flex-col relative h-full min-h-0 overflow-hidden`}>
             {!success && (
               <div className="absolute top-0 left-0 w-full h-1 bg-black/5 dark:bg-white/5">
@@ -385,7 +378,6 @@ export function NewDealWizard() {
                    </div>
                 ) : (
                    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                      {/* Cabecera Estática del Paso */}
                       <div className="px-6 md:px-8 pt-7 pb-3 shrink-0">
                         <div className="flex justify-between items-start">
                           <div className="flex flex-col">
@@ -408,7 +400,6 @@ export function NewDealWizard() {
                         </div>
                       </div>
 
-                      {/* Cuerpo de Formulario con Scroll Interno */}
                       <div className="flex-1 overflow-y-auto px-6 md:px-8 py-2 custom-scrollbar">
                         {errorMsg && (
                           <div className="mb-5 flex items-start gap-3 p-3.5 bg-red-500/10 border border-red-500/20 text-red-500 text-[12px] font-black rounded-2xl animate-in slide-in-from-top-2">
@@ -564,7 +555,6 @@ export function NewDealWizard() {
                                                 {idx === 0 && <span className="absolute top-0.5 left-0.5 bg-[#009ea8] text-white text-[6px] font-black px-1 rounded uppercase z-10">PRO</span>}
                                               </div>
                                               
-                                              {/* Overlays on Hover */}
                                               <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center gap-1.5 z-20 backdrop-blur-[1px]">
                                                  {idx > 0 && (
                                                     <button onClick={() => handleMoveImage(idx, -1)} className="p-0.5 bg-black/50 text-white rounded hover:bg-[#009ea8] transition-colors"><ArrowLeft className="w-3 h-3" /></button>
@@ -613,13 +603,40 @@ export function NewDealWizard() {
                                     </div>
                                   </div>
                                   <textarea ref={descriptionRef} placeholder="Explica detalladamente por qué es un buen precio..." value={description} onChange={e => setDescription(e.target.value)} rows={5} className={`w-full px-4 py-3 rounded-xl border transition-colors font-body text-[15px] outline-none resize-none custom-scrollbar ${themeClasses.inputBg}`} />
+                                  
+                                  {description.length > 0 && (
+                                    <div className={`mt-3 p-4 rounded-xl border border-dashed ${isDarkMode ? 'bg-white/[0.02] border-white/5' : 'bg-slate-50 border-slate-200'}`}>
+                                      <span className="text-[10px] font-heading font-black opacity-40 uppercase tracking-widest block mb-2">Vista Previa Markdown</span>
+                                      <div className={`text-sm font-body leading-relaxed md-preview ${themeClasses.textDesc}`}>
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{description}</ReactMarkdown>
+                                      </div>
+                                    </div>
+                                  )}
+
                                   <div className="text-right text-[11px] font-numbers text-gray-500 mt-1">{description.length} / Min 50 car</div>
                                </div>
                             </div>
                          )}
 
                          {mode === 'manual' && step === 3 && (
-                            <div className="space-y-5 animate-in slide-in-from-right-4 fade-in duration-300">
+                             <div className="space-y-5 animate-in slide-in-from-right-4 fade-in duration-300">
+                               <div className="space-y-2">
+                                  <label className="font-heading font-bold text-[11px] ml-1 uppercase tracking-widest opacity-50">Localización y Moneda <span className="text-red-500">*</span></label>
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                     {['MXN', 'ARS', 'CLP', 'COP', 'PEN', 'USD', 'EUR'].map((code) => (
+                                       <button
+                                         key={code}
+                                         type="button"
+                                         onClick={() => setCurrency(code)}
+                                         className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border-2 transition-all ${currency === code ? 'border-[#009ea8] bg-[#009ea8]/5 ring-4 ring-[#009ea8]/10' : (isDarkMode ? 'border-white/5 bg-white/5 opacity-50 hover:opacity-100' : 'border-slate-200 bg-white opacity-60 hover:opacity-100')}`}
+                                       >
+                                          <img src={getFlagUrl(code)} alt="" className="w-5 h-auto rounded-sm shadow-sm" />
+                                          <span className="text-[10px] font-heading font-black tracking-tight">{code}</span>
+                                       </button>
+                                     ))}
+                                  </div>
+                               </div>
+
                                <div className="grid grid-cols-2 gap-4">
                                   <div className="space-y-2">
                                      <label className="font-heading font-bold text-sm ml-1">Precio Oferta <span className="text-red-500">*</span></label>
@@ -679,17 +696,22 @@ export function NewDealWizard() {
                                         </div>
                                      </div>
                                   </div>
+                                  <div className={`mt-4 pt-4 border-t ${isDarkMode ? 'border-white/5' : 'border-slate-100'}`}>
+                                     <div className={`text-sm font-body leading-relaxed md-preview ${themeClasses.textDesc}`}>
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{description}</ReactMarkdown>
+                                     </div>
+                                  </div>
                                </div>
                                <div className="mt-5 p-4 rounded-xl border border-[#009ea8]/30 bg-[#009ea8]/5 flex items-center gap-3">
                                   <Sparkles className="w-6 h-6 text-[#009ea8] shrink-0" />
                                   <p className={`text-sm font-body ${themeClasses.textMuted}`}>¡Saldrán {images.length} foto(s) en tu galería! Presiona publicar para mandarlo a producción.</p>
-                               </div>
+                                </div>
                             </div>
                          )}
                         </div>
                       </div>
 
-                      <div className={`px-6 md:px-8 py-5 border-t border-inherit ${isDarkMode ? 'bg-[#0a0a0a]' : 'bg-white shadow-[0_-5px_15px_rgba(0,0,0,0.02)]'} flex items-center shrink-0 z-10 ${mode === 'bulk' ? 'justify-end' : 'justify-between'}`}>
+                      <div className={`px-6 md:px-8 py-5 border-t border-inherit ${isDarkMode ? 'bg-[#0a0a0a]' : 'bg-white shadow-[0_-5px_15_15px_rgba(0,0,0,0.02)]'} flex items-center shrink-0 z-10 ${mode === 'bulk' ? 'justify-end' : 'justify-between'}`}>
                          {mode === 'manual' && (
                            <>
                              <button onClick={handlePrev} className={`px-5 py-3 rounded-2xl text-[10px] font-heading font-black tracking-widest flex items-center gap-2 transition-all hover:translate-x-[-2px] ${step === 1 ? 'opacity-0 pointer-events-none' : (isDarkMode ? 'hover:bg-white/5 text-gray-400' : 'hover:bg-slate-100 text-slate-500')}`}><ChevronLeft className="w-4 h-4 shrink-0" /> ATRÁS</button>
@@ -706,6 +728,13 @@ export function NewDealWizard() {
                 )}
             </div>
         </div>
+        <style jsx global>{`
+          .md-preview h1, .md-preview h2, .md-preview h3 { font-weight: 900; margin-bottom: 0.5rem; }
+          .md-preview ul { list-style-type: disc; margin-left: 1.25rem; }
+          .md-preview ol { list-style-type: decimal; margin-left: 1.25rem; }
+          .md-preview strong { color: #009ea8; font-weight: 800; }
+          .md-preview p { margin-bottom: 0.5rem; }
+        `}</style>
     </div>
   );
 }

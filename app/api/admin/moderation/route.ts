@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import { formatPrice, getCurrencyFlag } from '@/lib/utils';
 
 // Inline helper
 function getFirstImage(urlData: any): string | null {
@@ -78,12 +79,14 @@ export async function POST(request: Request) {
 
             const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://cupoferta.com';
             const platformLink = `${siteUrl}/deal/${deal.id}`;
-            let message = telConfig.message_template || '🔥 <b>{title}</b>\n💰 {price}€\n\n📌 {store}\n\n<a href="{link}">Ver en tienda</a>';
+            let message = telConfig.message_template || '🔥 <b>{title}</b>\n💰 {flag} {price}\n\n📌 {store}\n\n<a href="{link}">Ver en tienda</a>';
 
             message = message
               .replace('{title}', escapeHtml(deal.title || ''))
-              .replace('{price}', escapeHtml((deal.price || 0).toString()))
-              .replace('{old_price}', escapeHtml((deal.old_price || 0).toString()))
+              .replace('{price}', escapeHtml(formatPrice(deal.price || 0, deal.currency)))
+              .replace('{old_price}', escapeHtml(formatPrice(deal.old_price || 0, deal.currency)))
+              .replace('{flag}', getCurrencyFlag(deal.currency))
+              .replace('{currency_code}', deal.currency || 'MXN')
               .replace('{store}', escapeHtml(deal.store || ''))
               .replace('{link}', deal.link || platformLink);
 

@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
       { header: 'DEAL_TYPE', key: 'deal_type', width: 15 },
       { header: 'COUPON_CODE', key: 'coupon_code', width: 20 },
       { header: 'SHIPPING_TYPE', key: 'shipping_type', width: 20 },
+      { header: 'CURRENCY', key: 'currency', width: 15 },
       { header: 'EXPIRES_AT', key: 'expires_at', width: 20 },
       { header: 'IMAGE_1', key: 'image_1', width: 40 },
       { header: 'IMAGE_2', key: 'image_2', width: 40 },
@@ -93,6 +94,7 @@ export async function GET(request: NextRequest) {
             deal_type: deal.deal_type || 'offer',
             coupon_code: deal.coupon_code,
             shipping_type: deal.shipping_type || 'Gratis',
+            currency: deal.currency || 'MXN',
             expires_at: deal.expires_at ? new Date(deal.expires_at).toISOString().split('T')[0] : '',
             image_1: deal.image_url?.[0] || '',
             image_2: deal.image_url?.[1] || '',
@@ -115,6 +117,7 @@ export async function GET(request: NextRequest) {
         deal_type: 'offer',
         coupon_code: '',
         shipping_type: 'Gratis',
+        currency: 'MXN',
         expires_at: '',
         image_1: 'https://ejemplo.com/imagen.jpg',
         image_2: '',
@@ -175,6 +178,16 @@ export async function GET(request: NextRequest) {
         error: 'El precio debe ser un número igual o mayor a cero.'
       };
       
+      // CURRENCY
+      worksheet.getCell(`L${i}`).dataValidation = {
+        type: 'list',
+        allowBlank: false,
+        formulae: [`"MXN,ARS,CLP,COP,PEN,USD,EUR"`],
+        showErrorMessage: true,
+        errorTitle: 'Error Moneda',
+        error: 'Selecciona una moneda válida'
+      };
+
       // OLD_PRICE (Numérico)
       worksheet.getCell(`E${i}`).dataValidation = {
         type: 'decimal',
@@ -187,7 +200,7 @@ export async function GET(request: NextRequest) {
       };
 
       // EXPIRES_AT (Fecha YYYY-MM-DD o formato válido)
-      worksheet.getCell(`L${i}`).dataValidation = {
+      worksheet.getCell(`M${i}`).dataValidation = {
         type: 'date',
         operator: 'greaterThanOrEqual',
         formulae: [new Date()],

@@ -7,7 +7,7 @@ import {
   AlertTriangle, Check, Ban, Send, Settings, Eye, ExternalLink, 
   RefreshCw, History, Flag, LayoutGrid, ListFilter
 } from 'lucide-react';
-import { getDealImages } from '@/lib/utils';
+import { getDealImages, formatPrice, getCurrencyFlag } from '@/lib/utils';
 
 // Icono de X (Twitter) — SVG inline
 const XIcon = ({ className }: { className?: string }) => (
@@ -16,14 +16,21 @@ const XIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const TelegramIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18.717-.962 4.084-1.362 5.411-.169.562-.338.751-.5.768-.36.035-.632-.235-.981-.462-.546-.356-.856-.577-1.387-.925-.612-.403-.216-.625.134-.985.092-.094 1.688-1.548 1.718-1.678.004-.017.007-.08-.041-.123-.048-.043-.118-.028-.169-.017-.071.015-1.21.758-3.414 2.227-.323.222-.616.331-.878.324-.29-.007-.847-.164-1.261-.298-.508-.165-.911-.252-.876-.532.018-.146.22-.295.604-.447 2.365-1.021 3.941-1.696 4.729-2.025 2.251-.937 2.718-1.099 3.024-1.104.067-.001.218.016.315.095.082.066.105.156.113.226.012.102.008.204-.002.306z" />
+  </svg>
+);
+
 // Genera tweet con Web Intent — sin API, abre X directamente
 function shareOnX(deal: any) {
-  const platformUrl = `https://cupoferta.com/deal/${deal.id}`;
-  const price = deal.price ? `${deal.price}€` : '';
-  const oldPrice = deal.old_price ? ` (antes ${deal.old_price}€)` : '';
-  const discount = deal.old_price && deal.price
-    ? ` -${Math.round((1 - deal.price / deal.old_price) * 100)}%`
-    : '';
+    const platformUrl = `https://cupoferta.com/deal/${deal.id}`;
+    const flag = getCurrencyFlag(deal.currency);
+    const price = deal.price ? `${flag} ${formatPrice(deal.price, deal.currency)}` : '';
+    const oldPrice = deal.old_price ? ` (antes ${formatPrice(deal.old_price, deal.currency)})` : '';
+    const discount = deal.old_price && deal.price
+      ? ` -${Math.round((1 - deal.price / deal.old_price) * 100)}%`
+      : '';
   
   const text = [
     `🔥 ${deal.title}`,
@@ -187,6 +194,26 @@ export function AdminModal() {
     setIsActionLoading(false);
   };
 
+  const handlePushTelegram = async (dealId: string) => {
+    setIsActionLoading(true);
+    try {
+      const res = await fetch('/api/admin/telegram/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dealId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('✅ Enviado a Telegram con éxito');
+      } else {
+        alert('❌ Error al enviar a Telegram: ' + (data.error || 'Error desconocido'));
+      }
+    } catch (e: any) {
+      alert('❌ Error: ' + e.message);
+    }
+    setIsActionLoading(false);
+  };
+
   const handleSendWarning = async () => {
     if (!warningTarget || !warningMsg) return;
     setIsActionLoading(true);
@@ -313,6 +340,13 @@ export function AdminModal() {
                            >
                              <XIcon className="w-3.5 h-3.5" />
                            </button>
+                           <button 
+                             onClick={() => handlePushTelegram(deal.id)} 
+                             title="Enviar a Telegram"
+                             className={`p-2 rounded-lg transition-colors bg-[#0088cc]/10 hover:bg-[#0088cc]/20 text-[#0088cc]`}
+                           >
+                             <TelegramIcon className="w-3.5 h-3.5" />
+                           </button>
                            <button onClick={() => handleModerationAction([deal.id], 'approve')} title="Aprobar" className="p-2 bg-green-500/10 text-green-500 rounded-lg hover:bg-green-500/20 transition-colors"><Check className="w-3.5 h-3.5" /></button>
                            <button onClick={() => handleModerationAction([deal.id], 'reject')} title="Rechazar" className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors"><Ban className="w-3.5 h-3.5" /></button>
                         </div>
@@ -339,6 +373,13 @@ export function AdminModal() {
                         <div className="flex gap-1.5 shrink-0">
                            <button onClick={() => shareOnX(deal)} title="Compartir en X" className={`p-2 rounded-lg transition-colors ${isDarkMode ? 'bg-white/5 hover:bg-white/15 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>
                              <XIcon className="w-3.5 h-3.5" />
+                           </button>
+                           <button 
+                             onClick={() => handlePushTelegram(deal.id)} 
+                             title="Enviar a Telegram"
+                             className={`p-2 rounded-lg transition-colors bg-[#0088cc]/10 hover:bg-[#0088cc]/20 text-[#0088cc]`}
+                           >
+                             <TelegramIcon className="w-3.5 h-3.5" />
                            </button>
                            <button onClick={() => handleModerationAction([deal.id], deal.status === 'approved' ? 'reject' : 'approve')} className={`p-2 rounded-lg ${deal.status === 'approved' ? 'text-red-500 bg-red-500/10' : 'text-green-500 bg-green-500/10'}`}>
                              {deal.status === 'approved' ? <Ban className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
@@ -459,10 +500,10 @@ export function AdminModal() {
                         <textarea value={telegramConfig?.message_template} onChange={e => setTelegramConfig({...telegramConfig, message_template: e.target.value})} rows={5} className={`w-full p-3 rounded-xl text-xs border-none shadow-inner resize-none ${tc.input}`} placeholder="🔥 <b>{title}</b>&#10;💰 {price}€" />
                         <div className={`text-[9px] mt-2 p-2 rounded-lg bg-black/5 border border-inherit leading-relaxed ${tc.muted}`}>
                           <b>Variables disponibles:</b><br/>
-                          <code>{'{title}'}</code>, <code>{'{price}'}</code>, <code>{'{old_price}'}</code>, <code>{'{store}'}</code>, <code>{'{link}'}</code><br/>
+                          <code>{'{title}'}</code>, <code>{'{price}'}</code>, <code>{'{old_price}'}</code>, <code>{'{store}'}</code>, <code>{'{link}'}</code>, <code>{'{flag}'}</code>, <code>{'{currency_code}'}</code><br/>
                           <b>Ejemplo de uso:</b><br/>
                           🔥 &lt;b&gt;{'{title}'}&lt;/b&gt;<br/>
-                          💰 Sólo: {'{price}'}€ (antes {'{old_price}'}€)
+                          💰 Sólo: {'{flag}'} {'{price}'} (antes {'{old_price}'})
                         </div>
                       </div>
 

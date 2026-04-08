@@ -2,10 +2,12 @@
 import { useUIStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase/client';
 import { ChevronRight, ChevronUp, ChevronDown, Eye, Flame, BarChart3, ExternalLink, Truck, Calendar, RefreshCcw, Save, Trash2, Clock, Pause, Edit } from 'lucide-react';
-import { getDealImages, getRemainingTime } from '@/lib/utils';
+import { getDealImages, getRemainingTime, formatPrice, getCurrencyFlag, CURRENCIES, getFlagUrl } from '@/lib/utils';
 import { useEffect, useRef, useState } from 'react';
 import { CommentSection } from './CommentSection';
 import { VotesSection } from './VotesSection';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export function DealDrawer() {
   const { selectedDeal, setSelectedDeal, drawerMode, setDrawerMode, isDarkMode, user, setAuthModalOpen, dealTemps, setDealTemp, dealVotes, setDealVote, dealViews, setDealView } = useUIStore();
@@ -25,6 +27,7 @@ export function DealDrawer() {
   const [editDesc, setEditDesc] = useState('');
   const [editPrice, setEditPrice] = useState('');
   const [editLink, setEditLink] = useState('');
+  const [editCurrency, setEditCurrency] = useState('');
 
   const [timeLeft, setTimeLeft] = useState<string | null>(getRemainingTime(selectedDeal?.expires_at));
 
@@ -165,6 +168,7 @@ export function DealDrawer() {
     setEditDesc(selectedDeal.description || '');
     setEditPrice(selectedDeal.price?.toString() || '');
     setEditLink(selectedDeal.link || '');
+    setEditCurrency(selectedDeal.currency || 'MXN');
     setIsEditing(true);
     setIsRenewing(false);
   };
@@ -176,7 +180,8 @@ export function DealDrawer() {
       title: editTitle,
       description: editDesc,
       price: parseFloat(editPrice) || 0,
-      link: editLink
+      link: editLink,
+      currency: editCurrency
     };
     
     const { error } = await supabase.from('deals').update(updateData).eq('id', selectedDeal.id);
@@ -235,8 +240,18 @@ export function DealDrawer() {
              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="flex flex-col lg:flex-row gap-6">
                    <div className="w-full lg:w-5/12 flex flex-col gap-3">
-                      <div className={`w-full aspect-square rounded-xl overflow-hidden border flex items-center justify-center p-6 transition-all ${isDarkMode ? 'bg-[#141414] border-[#333333]' : 'bg-slate-100 border-slate-100'}`}>
+                      <div className={`relative w-full aspect-square rounded-xl overflow-hidden border flex items-center justify-center p-6 transition-all ${isDarkMode ? 'bg-[#141414] border-[#333333]' : 'bg-slate-100 border-slate-100'}`}>
                          <img src={getDealImages(selectedDeal.image_url)[activeGalleryImage] || getDealImages(selectedDeal.image_url)[0]} className="w-full h-full object-contain animate-in fade-in duration-300" alt={selectedDeal.title} />
+                         
+                         {/* Currency Overlay - Strategic Zone */}
+                         <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5 animate-in slide-in-from-right-2 duration-500">
+                            <div className="bg-white/90 backdrop-blur-sm p-1.5 rounded-xl shadow-xl border border-white/20 flex items-center justify-center transform hover:scale-110 transition-transform">
+                              <img src={getFlagUrl(selectedDeal.currency)} alt="" className="w-6 h-auto rounded-sm shadow-sm" />
+                            </div>
+                            <div className="bg-black/80 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-heading font-black text-white border border-white/10 shadow-2xl tracking-widest">
+                              {selectedDeal.currency || 'MXN'}
+                            </div>
+                         </div>
                       </div>
                       {/* Mini Thumbnail Gallery si hay multi-images */}
                       {getDealImages(selectedDeal.image_url).length > 1 && (
@@ -254,16 +269,19 @@ export function DealDrawer() {
                       )}
                    </div>
                    <div className="flex-1 space-y-4">
-                      <span className="bg-[#009ea8]/10 text-[#009ea8] text-[9px] font-heading font-black px-2 py-0.5 rounded-lg tracking-wider inline-block uppercase border border-[#009ea8]/20">{selectedDeal.store}</span>
-                      <h2 className={`text-lg md:text-xl font-heading font-black leading-tight line-clamp-3 ${themeClasses.textStrong}`} title={selectedDeal.title}>{selectedDeal.title}</h2>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="bg-[#009ea8]/10 text-[#009ea8] text-[9px] font-heading font-black px-2 py-1 rounded-lg tracking-wider inline-block uppercase border border-[#009ea8]/20">{selectedDeal.store}</span>
+                        <span className={`text-[10px] font-heading font-black px-2 py-1 rounded-lg border shadow-sm transition-all duration-300 ${timeLeft ? 'bg-red-500/10 text-red-500 border-red-500/20 animate-pulse' : (isDarkMode ? 'bg-white/5 border-white/5 text-gray-400' : 'bg-slate-50 border-slate-200 text-slate-500')}`}>
+                          {getTimeAgo(selectedDeal.created_at)}
+                        </span>
+                      </div>
+                      <h2 className={`text-xl md:text-2xl font-heading font-black leading-tight line-clamp-3 ${themeClasses.textStrong}`} title={selectedDeal.title}>{selectedDeal.title}</h2>
                       <div className={`flex flex-wrap items-center justify-between gap-3 py-2.5 border-y ${isDarkMode ? 'border-white/5' : 'border-slate-100'}`}>
                          <div className="flex items-center gap-2.5">
                             <img src={selectedDeal.profiles?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=Anon"} alt="Autor" className={`w-8 h-8 rounded-full border shadow-sm ${isDarkMode ? 'border-white/10' : 'border-slate-200'}`} />
                             <div className="flex flex-col -space-y-0.5">
                                <span className={`text-[12px] font-heading font-black ${themeClasses.textStrong}`}>{selectedDeal.profiles?.username}</span>
-                               <span className={`text-[11px] font-body font-medium px-2 py-0.5 rounded-md border shadow-sm transition-all duration-300 ${timeLeft ? 'bg-red-500/10 text-red-500 border-red-500/20' : (isDarkMode ? 'bg-[#1a1a1a] border-[#262626] text-gray-500' : 'bg-white border-slate-200 text-slate-500')}`}>
-                                 {getTimeAgo(selectedDeal.created_at)}
-                               </span>
+                               <span className={`text-[10px] ${themeClasses.textMuted}`}>Publicó esta oferta</span>
                             </div>
                          </div>
                          <div className={`flex items-center gap-1.5 border px-2 py-1 rounded-lg text-[9px] font-heading font-black text-[#009ea8] uppercase tracking-widest ${isDarkMode ? 'border-white/5 bg-white/[0.03]' : 'border-slate-100 bg-white'}`}>
@@ -271,8 +289,8 @@ export function DealDrawer() {
                          </div>
                       </div>
                       <div className="pt-1 flex items-center gap-2.5 flex-wrap">
-                         <span className={`text-2xl md:text-3xl font-numbers font-black ${themeClasses.textStrong}`}>${selectedDeal.price.toLocaleString()}</span>
-                         <span className={`text-sm font-numbers font-bold line-through decoration-red-400/80 decoration-2 opacity-60 ${themeClasses.textMuted}`}>${selectedDeal.old_price.toLocaleString()}</span>
+                          <span className={`text-2xl md:text-3xl font-numbers font-black ${themeClasses.textStrong}`}>{formatPrice(selectedDeal.price, selectedDeal.currency)}</span>
+                          <span className={`text-sm font-numbers font-bold line-through decoration-red-400/80 decoration-2 opacity-60 ${themeClasses.textMuted}`}>{formatPrice(selectedDeal.old_price, selectedDeal.currency)}</span>
                          <span className="px-2 py-0.5 rounded-md text-[10px] font-numbers font-extrabold bg-[#facc15] text-black shadow-sm shadow-[#facc15]/10">- {Math.round((1 - selectedDeal.price/selectedDeal.old_price) * 100)}%</span>
                       </div>
                       <div className="flex items-center gap-4 py-2">
@@ -334,10 +352,22 @@ export function DealDrawer() {
                                         <input type="number" value={editPrice} onChange={e=>setEditPrice(e.target.value)} className="w-full bg-transparent border-none outline-none text-[13px]" />
                                       </div>
                                     </div>
-                                    <div className="flex-[2]">
+                                    <div className="flex-1">
+                                       <span className="text-[10px] opacity-60 ml-1">Moneda</span>
+                                       <select 
+                                          value={editCurrency} 
+                                          onChange={e => setEditCurrency(e.target.value)} 
+                                          className={`w-full px-3 py-2 rounded-xl border text-[13px] ${themeClasses.inputBg}`}
+                                       >
+                                          {CURRENCIES.map(curr => (
+                                            <option key={curr.code} value={curr.code}>{curr.flag} {curr.code}</option>
+                                          ))}
+                                       </select>
+                                     </div>
+                                  </div>
+                                  <div>
                                       <span className="text-[10px] opacity-60 ml-1">Enlace Oficial</span>
                                       <input value={editLink} onChange={e=>setEditLink(e.target.value)} className={`w-full px-3 py-2 rounded-xl border text-[13px] ${themeClasses.inputBg}`} />
-                                    </div>
                                   </div>
                                 </div>
 
@@ -423,9 +453,13 @@ export function DealDrawer() {
                 </div>
                  <div className={`p-6 rounded-2xl border ${isDarkMode ? 'bg-[#111111] border-white/5' : 'bg-slate-100 border-slate-100'}`}>
                   <h3 className={`font-heading font-bold text-lg mb-3 ${themeClasses.textStrong}`}>Acerca de esta oferta</h3>
-                  <div className={`text-[14px] font-body leading-relaxed ${themeClasses.textDesc}`}>
-                    <p className={!isDescExpanded ? "line-clamp-3" : ""}>{selectedDeal.description}</p>
-                    {selectedDeal.description.length > 100 && (
+                  <div className={`text-[14px] font-body leading-relaxed md-content ${themeClasses.textDesc}`}>
+                    <div className={!isDescExpanded ? "line-clamp-4" : ""}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {selectedDeal.description}
+                      </ReactMarkdown>
+                    </div>
+                    {selectedDeal.description.length > 200 && (
                       <button onClick={() => setIsDescExpanded(!isDescExpanded)} className="mt-2 text-[#009ea8] font-heading font-bold text-[13px] hover:underline transition-all">
                         {isDescExpanded ? 'Ver menos' : 'Ver más'}
                       </button>

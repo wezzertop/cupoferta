@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
       const deal_type = row.getCell(headers['DEAL_TYPE'])?.value?.toString().trim() || 'offer';
       const coupon_code = row.getCell(headers['COUPON_CODE'])?.value?.toString().trim() || null;
       const shipping_type = row.getCell(headers['SHIPPING_TYPE'])?.value?.toString().trim() || 'Gratis';
+      const currency = row.getCell(headers['CURRENCY'])?.value?.toString().trim() || 'MXN';
 
       // Advanced Optional Fields
       let expiresAtValue = row.getCell(headers['EXPIRES_AT'])?.value;
@@ -110,6 +111,7 @@ export async function POST(request: NextRequest) {
           deal_type,
           coupon_code,
           shipping_type,
+          currency,
           expires_at,
           image_url: images
         });
@@ -174,6 +176,7 @@ export async function POST(request: NextRequest) {
             deal_type: row.deal_type,
             coupon_code: row.coupon_code,
             shipping_type: row.shipping_type,
+            currency: row.currency,
             expires_at: row.expires_at,
             image_url: finalImages, // Uses the freshly processed images, or conserved if none
             status: 'pending' // Volver a sugerir revisión por seguridad
@@ -245,6 +248,7 @@ export async function POST(request: NextRequest) {
         deal_type: row.deal_type,
         coupon_code: row.coupon_code,
         shipping_type: row.shipping_type,
+        currency: row.currency,
         status: 'pending',
         expires_at: row.expires_at,
         image_url: finalImages 

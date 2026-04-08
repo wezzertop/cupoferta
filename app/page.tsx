@@ -92,6 +92,7 @@ export default function Home() {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const PAGE_SIZE = 12;
 
   const { isDarkMode, setAuthModalOpen, user, setUser, activeFilter, categoryFilter, activeTab, setSearchModalOpen, setNewDealModalOpen, setFiltersModalOpen, setSelectedDeal, setDrawerMode } = useUIStore();
@@ -143,11 +144,12 @@ export default function Home() {
     kbd: isDarkMode ? 'border-[#333] text-gray-600 bg-[#0a0a0a]' : 'border-slate-200 text-slate-400 bg-slate-50',
   };
 
-  // ── Auth listener ──────────────────────────────────────────
+  // Detect screen size for ads
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user || null));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user || null));
-    return () => subscription.unsubscribe();
+    const checkMobile = () => setIsMobile(window.innerWidth < 1280);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   // Reset pagination when filters change
@@ -323,8 +325,8 @@ export default function Home() {
             {pageTitle}
           </h2>
 
-          {/* Ad Banner - Centered on large screens, full width on small */}
-          <div className="w-full xl:flex-1 xl:w-auto order-last xl:order-none flex justify-center overflow-hidden">
+          {/* Ad Banner - Hidden on mobile, only on XL+ */}
+          <div className="hidden xl:flex xl:flex-1 xl:w-auto order-last xl:order-none justify-center overflow-hidden">
             <AdBanner isDarkMode={isDarkMode} />
           </div>
 
@@ -391,8 +393,21 @@ export default function Home() {
             ) : (
               <>
                 <div className={gridCols}>
-                  {deals.map(deal => (
-                    <DealCard key={deal.id} deal={deal} viewMode={viewMode} />
+                  {deals.map((deal, index) => (
+                    <div key={deal.id} className="contents">
+                      <DealCard deal={deal} viewMode={viewMode} />
+                      {isMobile && (index + 1) % 5 === 0 && (
+                        <div className="w-full rounded-2xl border p-4 bg-white dark:bg-[#141414] border-slate-100 dark:border-white/5 overflow-hidden shadow-sm flex flex-col">
+                           <div className="flex items-center gap-1.5 opacity-40 mb-3">
+                              <Megaphone className="w-3 h-3 text-slate-500 dark:text-gray-400" />
+                              <span className="text-[10px] font-heading font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-gray-400">
+                                Anuncio
+                              </span>
+                           </div>
+                           <NativeAd />
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
 
