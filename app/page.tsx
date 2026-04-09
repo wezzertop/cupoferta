@@ -28,9 +28,6 @@ import { NativeAd } from '@/components/ads/NativeAd';
    COMPONENTE: Banner Publicitario
    ============================================================ */
 function AdBanner({ isDarkMode, className = '' }: { isDarkMode: boolean; className?: string }) {
-  // ── Segura Fix: No renderizar en pantallas pequeñas para evitar redirecciones ──
-  if (typeof window !== 'undefined' && window.innerWidth < 1024) return null;
-
   return (
     <div className={`flex flex-col items-center justify-center w-full relative ${className}`}>
       <div className="flex items-center gap-1.5 opacity-40 absolute -top-5">
