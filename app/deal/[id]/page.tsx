@@ -32,8 +32,11 @@ export async function generateMetadata(
     if (Array.isArray(deal.image_url)) firstImage = deal.image_url[0];
     else if (deal.image_url.startsWith('[')) {
       try { const p = JSON.parse(deal.image_url); if (p.length > 0) firstImage = p[0]; } catch {}
-    } else if (deal.image_url.includes(',')) firstImage = deal.image_url.split(',')[0].trim();
-    else firstImage = deal.image_url;
+    } else if (deal.image_url.includes(',') && !deal.image_url.startsWith('data:')) {
+      firstImage = deal.image_url.split(',')[0].trim();
+    } else {
+      firstImage = deal.image_url;
+    }
   }
 
   return {

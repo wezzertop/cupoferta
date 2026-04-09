@@ -28,6 +28,9 @@ import { NativeAd } from '@/components/ads/NativeAd';
    COMPONENTE: Banner Publicitario
    ============================================================ */
 function AdBanner({ isDarkMode, className = '' }: { isDarkMode: boolean; className?: string }) {
+  // ── Segura Fix: No renderizar en pantallas pequeñas para evitar redirecciones ──
+  if (typeof window !== 'undefined' && window.innerWidth < 1024) return null;
+
   return (
     <div className={`flex flex-col items-center justify-center w-full relative ${className}`}>
       <div className="flex items-center gap-1.5 opacity-40 absolute -top-5">
@@ -144,12 +147,15 @@ export default function Home() {
     kbd: isDarkMode ? 'border-[#333] text-gray-600 bg-[#0a0a0a]' : 'border-slate-200 text-slate-400 bg-slate-50',
   };
 
-  // Detect screen size for ads
+  // Detect screen size for layout and ad targeting
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 1280);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    const checkSize = () => {
+      // 1024px is a more standard threshold for mobile/tablet behavior in this layout
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkSize();
+    window.addEventListener('resize', checkSize);
+    return () => window.removeEventListener('resize', checkSize);
   }, []);
 
   // Reset pagination when filters change

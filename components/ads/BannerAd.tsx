@@ -8,6 +8,14 @@ export function BannerAd() {
   useEffect(() => {
     // Solo ejecutar en el cliente y si el contenedor existe
     if (typeof window !== 'undefined' && containerRef.current) {
+      // ── ANTIGRAVITY SECURITY FIX ──
+      // Desactivamos anuncios en móviles reales (< 768px) para evitar redirecciones maliciosas
+      // que reportaron los usuarios en dispositivos móviles.
+      if (window.innerWidth < 768) {
+        console.log('[Ads] BannerAd disabled on mobile to prevent redirects');
+        return;
+      }
+
       // Evitar duplicados si ya hay contenido
       if (containerRef.current.hasChildNodes()) {
         return;

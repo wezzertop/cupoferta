@@ -37,11 +37,12 @@ export function getDealImages(urlData: any): string[] {
   }
   
   // 3. Handle CSV (handles "url1, url2")
-  if (trimmed.includes(',')) {
+  // Importante: No separar si es una Data URL (Base64) ya que contiene comas
+  if (trimmed.includes(',') && !trimmed.startsWith('data:')) {
     return trimmed.split(',').map(u => u.trim()).filter(Boolean);
   }
   
-  // 4. Single URL
+  // 4. Single URL or Base64
   return [trimmed];
 }
 

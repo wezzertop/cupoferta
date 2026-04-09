@@ -33,9 +33,21 @@ export async function POST(request: NextRequest) {
     const headerRow = worksheet.getRow(1);
     const headers: Record<string, number> = {};
     headerRow.eachCell((cell, colNumber) => {
-      let headerText = cell.value?.toString().trim().toUpperCase();
+      let cellVal = cell.value;
+      let headerText = '';
+      
+      if (cellVal) {
+        if (typeof cellVal === 'object') {
+          if ('richText' in cellVal) headerText = (cellVal as any).richText.map((rt: any) => rt.text).join('').trim();
+          else headerText = cellVal.toString();
+        } else {
+          headerText = cellVal.toString();
+        }
+      }
+
+      headerText = headerText.trim().toUpperCase();
       if (headerText) {
-        headerText = headerText.replace(/\*/g, '').trim(); // Remove strict indicators
+        headerText = headerText.replace(/\*/g, '').trim(); // Eliminar asteriscos de obligatorios
         headers[headerText] = colNumber;
       }
     });
@@ -88,13 +100,34 @@ export async function POST(request: NextRequest) {
       }
 
       // Collect images
+      // Collect images - De forma más robusta (Busca IMAGE_1, IMAGE_2... IMAGE 1, IMAGE1, etc)
       const images: string[] = [];
-      ['IMAGE_1', 'IMAGE_2', 'IMAGE_3', 'IMAGE_4'].forEach(imgKey => {
-         if (headers[imgKey]) {
-            let cellVal = row.getCell(headers[imgKey]).value;
-            let imgUrl = typeof cellVal === 'object' && cellVal !== null && 'hyperlink' in cellVal ? (cellVal as any).hyperlink : cellVal?.toString().trim();
-            if (imgUrl) images.push(imgUrl);
-         }
+      
+      // Buscar cualquier columna que empiece por IMAGE
+      Object.keys(headers).forEach(h => {
+        if (h.startsWith('IMAGE')) {
+          const colIndex = headers[h];
+          const cell = row.getCell(colIndex);
+          let cellVal = cell.value;
+          let imgUrl = '';
+
+          if (cellVal) {
+            if (typeof cellVal === 'object') {
+              // Caso 1: Hyperlink
+              if ('hyperlink' in cellVal) imgUrl = (cellVal as any).hyperlink;
+              // Caso 2: RichText
+              else if ('richText' in cellVal) imgUrl = (cellVal as any).richText.map((rt: any) => rt.text).join('').trim();
+              // Caso 3: Fallback toString si no es null
+              else imgUrl = cellVal.toString().trim();
+            } else {
+              imgUrl = cellVal.toString().trim();
+            }
+
+            if (imgUrl && !imgUrl.startsWith('[object')) {
+              images.push(imgUrl);
+            }
+          }
+        }
       });
 
       if (title && description && link) {
@@ -159,7 +192,8 @@ export async function POST(request: NextRequest) {
           if (row.image_url && row.image_url.length > 0) {
              const processed = await Promise.all(row.image_url.map(async (url: string) => {
                 if (url.includes('supabase.co/storage/v1/object/public/deal_images')) return url;
-                return await processAndUploadImage(url, user.id);
+                const uploaded = await processAndUploadImage(url, user.id);
+                return uploaded || url; // Fallback al original si falla el procesamiento
              }));
              finalImages = processed.filter(Boolean) as string[];
           }
@@ -231,7 +265,8 @@ export async function POST(request: NextRequest) {
          const processed = await Promise.all(row.image_url.map(async (url: string) => {
             // Fast skip logic for already-processed supadase links, saving computation
             if (url.includes('supabase.co/storage/v1/object/public/deal_images')) return url;
-            return await processAndUploadImage(url, user.id);
+            const uploaded = await processAndUploadImage(url, user.id);
+            return uploaded || url; // Fallback al original si falla
          }));
          finalImages = processed.filter(Boolean) as string[];
       }

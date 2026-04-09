@@ -10,7 +10,8 @@ function getFirstImage(urlData: any): string | null {
   if (urlStr.startsWith('[')) {
     try { const p = JSON.parse(urlStr); if (Array.isArray(p) && p.length > 0) return p[0]; } catch {}
   }
-  if (urlStr.includes(',')) return urlStr.split(',')[0].trim();
+  // No separar si es una Data URL (Base64)
+  if (urlStr.includes(',') && !urlStr.startsWith('data:')) return urlStr.split(',')[0].trim();
   return urlStr || null;
 }
 
