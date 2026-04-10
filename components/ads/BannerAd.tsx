@@ -2,11 +2,22 @@
 
 import { useEffect, useRef } from 'react';
 
-export function BannerAd() {
+export function BannerAd({ isDarkMode }: { isDarkMode: boolean }) {
+  const bgColor = isDarkMode ? '#141414' : 'transparent';
   const adHtml = `
     <html>
       <head>
-        <style>body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; overflow: hidden; }</style>
+        <style>
+          body { 
+            margin: 0; 
+            padding: 0; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            overflow: hidden; 
+            background-color: ${bgColor};
+          }
+        </style>
       </head>
       <body>
         <script type="text/javascript">
@@ -31,15 +42,7 @@ export function BannerAd() {
         width="468"
         height="60"
         style={{ border: 'none', overflow: 'hidden' }}
-        /* 
-           SANDBOX:
-           - allow-scripts: permite que el anuncio funcione.
-           - allow-forms: permite formularios dentro del anuncio.
-           - allow-popups: permite que al hacer clic se abra la página del anunciante.
-           - allow-popups-to-escape-sandbox: permite que el popup no sea sandboxed.
-           - SIN allow-top-navigation: ESTO EVITA QUE EL ANUNCIO REDIRIJA NUESTRA APP.
-        */
-        sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
+        sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin"
         scrolling="no"
       />
     </div>

@@ -271,7 +271,7 @@ export function DealCard({ deal, viewMode }: { deal: Deal; viewMode: 'grid' | 'l
       </div>
 
       {/* ── CONTENT AREA ── */}
-      <div className={`flex-1 flex flex-col min-w-0 ${viewMode === 'list' ? 'p-3 sm:p-5' : 'p-4 sm:p-6'}`}>
+      <div className={`flex-1 flex flex-col min-w-0 ${viewMode === 'list' ? 'p-3 sm:px-10 sm:py-7' : 'p-4 sm:p-6'}`}>
         <div>
           {/* Metadata Row */}
           <div className="flex items-center justify-between mb-2">
@@ -291,11 +291,11 @@ export function DealCard({ deal, viewMode }: { deal: Deal; viewMode: 'grid' | 'l
 
           {/* Title & Description */}
           <div className={`${viewMode === 'list' ? 'max-w-[85%] mb-2' : 'w-full'}`}>
-            <h3 className={`font-heading font-bold leading-tight transition-colors text-sm sm:text-lg line-clamp-2 ${themeClasses.textStrong} group-hover/card:text-[#009ea8] ${viewMode === 'list' ? 'mb-1.5' : 'mb-1 sm:mb-2'}`}>
+            <h3 className={`font-heading font-bold leading-tight transition-colors text-[15px] sm:text-lg line-clamp-3 sm:line-clamp-2 ${themeClasses.textStrong} group-hover/card:text-[#009ea8] ${viewMode === 'list' ? 'mb-1.5' : 'mb-1 sm:mb-2'}`}>
               {deal.title}
             </h3>
             {viewMode === 'list' && (
-              <p className={`text-xs sm:text-sm font-body line-clamp-2 leading-relaxed opacity-60 ${themeClasses.textDesc}`}>
+              <p className={`hidden sm:line-clamp-2 text-xs sm:text-sm font-body leading-relaxed opacity-60 ${themeClasses.textDesc}`}>
                 {deal.description}
               </p>
             )}
@@ -318,15 +318,22 @@ export function DealCard({ deal, viewMode }: { deal: Deal; viewMode: 'grid' | 'l
                 </span>
               </>
             )}
-            <div className={`hidden sm:flex items-center gap-1.5 border px-2 py-1 rounded-lg text-[9px] font-heading font-black text-[#009ea8] uppercase tracking-wider ml-auto ${isDarkMode ? 'border-white/5 bg-white/[0.03]' : 'border-slate-100 bg-slate-50/50'}`}>
-              <Truck className="w-3 h-3" /> {deal.shipping_type}
-            </div>
+            {deal.shipping_type !== 'No aplica' && (
+              <div className={`flex items-center gap-1 sm:gap-1.5 border px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg text-[8px] sm:text-[9px] font-heading font-black uppercase tracking-wider ${
+                deal.shipping_type === 'Gratis' 
+                  ? 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5' 
+                  : 'text-rose-500 border-rose-500/20 bg-rose-500/5'
+              }`}>
+                <Truck className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                <span className={`${viewMode === 'list' ? 'hidden sm:inline' : ''} ml-1`}>{deal.shipping_type}</span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* ── ACTIONS ROW ── */}
         <div className={`flex items-center gap-3 mt-auto pt-3 border-t ${isDarkMode ? 'border-white/5' : 'border-slate-100'} ${viewMode === 'grid' ? 'flex-col items-stretch' : 'justify-between'}`}>
-          <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar py-0.5">
+          <div className="flex items-center justify-between sm:justify-start gap-1 overflow-x-auto hide-scrollbar py-0.5 w-full">
             <button onClick={(e) => { e.stopPropagation(); openDrawer('chat'); }} className={`flex items-center gap-1.5 px-2 py-1.5 rounded-xl border transition-all btn-effect ${themeClasses.btnBase} ${themeClasses.btnCommentsHover}`}>
               <MessageCircle className="w-3.5 h-3.5" />
               <span className="text-[10px] sm:text-[12px] font-numbers font-bold">{localComments}</span>

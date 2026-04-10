@@ -22,13 +22,13 @@ export async function processAndUploadImage(url: string, userId: string): Promis
     }
 
     // Process with sharp (Square 1:1, white background padding)
-    const MAX_SIZE = 800;
+    const MAX_SIZE = 1200; // Aumentado para mayor nitidez
     const processedBuffer = await sharp(buffer)
       .resize(MAX_SIZE, MAX_SIZE, {
         fit: 'contain',
         background: { r: 255, g: 255, b: 255, alpha: 1 }
       })
-      .jpeg({ quality: 85 })
+      .jpeg({ quality: 90, mozjpeg: true }) // Calidad 90 y mozjpeg para mejor compresión/nitidez
       .toBuffer();
 
     const fileName = `${Math.random().toString(36).substring(2,15)}.jpg`;

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { formatPrice, getCurrencyFlag } from '@/lib/utils';
+import { formatPrice, getCurrencyFlag, getHighResImageUrl } from '@/lib/utils';
 
 // Helper to extract first image
 function getFirstImage(urlData: any): string | null {
@@ -94,7 +94,8 @@ export async function POST(request: Request) {
             imageBytes = new Uint8Array(Buffer.from(match[2], 'base64'));
           }
         } else if (rawImageUrl.startsWith('http')) {
-          const imgFetch = await fetch(rawImageUrl, { signal: AbortSignal.timeout(15_000) });
+          const optimizedUrl = getHighResImageUrl(rawImageUrl);
+          const imgFetch = await fetch(optimizedUrl, { signal: AbortSignal.timeout(15_000) });
           if (imgFetch.ok) {
             const arrayBuf = await imgFetch.arrayBuffer();
             imageBytes = new Uint8Array(arrayBuf);

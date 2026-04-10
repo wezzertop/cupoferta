@@ -37,7 +37,7 @@ function AdBanner({ isDarkMode, className = '' }: { isDarkMode: boolean; classNa
         </span>
       </div>
       <div className="w-full flex justify-center overflow-hidden rounded-xl">
-        <BannerAd />
+        <BannerAd isDarkMode={isDarkMode} />
       </div>
     </div>
   );
@@ -407,7 +407,7 @@ export default function Home() {
                                 Anuncio
                               </span>
                            </div>
-                           <NativeAd />
+                           <NativeAd isDarkMode={isDarkMode} />
                         </div>
                       )}
                     </div>
@@ -471,7 +471,7 @@ export default function Home() {
                       Anuncio
                     </span>
                  </div>
-                 <NativeAd />
+                 <NativeAd isDarkMode={isDarkMode} />
               </div>
             </aside>
           )}

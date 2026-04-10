@@ -96,3 +96,26 @@ export function getFlagUrl(currencyCode: string = 'MXN') {
   const currency = CURRENCIES.find(c => c.code === currencyCode) || CURRENCIES[0];
   return `https://flagcdn.com/w40/${currency.iso}.png`;
 }
+
+/**
+ * Intenta transformar una URL de imagen (de Amazon, Miravia, etc)
+ * a su versión de máxima resolución posible antes de procesarla o enviarla.
+ */
+export function getHighResImageUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  
+  // 1. URLs de Amazon (ej: ._AC_SX679_.jpg -> ._AC_SL1500_.jpg)
+  if (url.includes('media-amazon.com') || url.includes('ssl-images-amazon.com')) {
+    // Reemplaza cualquier transformador de Amazon por uno de alta resolución (1500px)
+    // O simplemente quita el transformador para obtener la original
+    return url.replace(/\._AC_[^.]+\./, '._AC_SL1500_.');
+  }
+  
+  // 2. AliExpress / Miravia (ej: img.alicdn.com/..._220x220.jpg)
+  if (url.includes('alicdn.com')) {
+    // Quita el sufijo de dimensiones que suelen añadir
+    return url.replace(/_[0-9]+x[0-9]+[^.]+\.[a-z0-9]+$/i, '');
+  }
+
+  return url;
+}

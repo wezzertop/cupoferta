@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { formatPrice, getCurrencyFlag } from '@/lib/utils';
+import { formatPrice, getCurrencyFlag, getHighResImageUrl } from '@/lib/utils';
 
 // Inline helper
 function getFirstImage(urlData: any): string | null {
@@ -130,8 +130,10 @@ export async function POST(request: Request) {
 
                   } else if (rawImageUrl.startsWith('http')) {
                     // ── Caso 2: URL HTTP/HTTPS ───────────────────────────────────
-                    console.log('[Telegram] Descargando imagen desde URL:', rawImageUrl.slice(0, 80));
-                    const imgFetch = await fetch(rawImageUrl, { signal: AbortSignal.timeout(15_000) });
+                    // Optimizamos la URL si es de un marketplace (Amazon/Miravia) para evitar pixelación
+                    const optimizedUrl = getHighResImageUrl(rawImageUrl);
+                    console.log('[Telegram] Descargando imagen desde URL:', optimizedUrl.slice(0, 80));
+                    const imgFetch = await fetch(optimizedUrl, { signal: AbortSignal.timeout(15_000) });
                     if (imgFetch.ok) {
                       const arrayBuf = await imgFetch.arrayBuffer();
                       imageBytes = new Uint8Array(arrayBuf);
