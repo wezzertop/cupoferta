@@ -13,6 +13,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
+    // Verificar si el usuario es administrador
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    
+    const isAdmin = profile?.role === 'admin';
+
     const formData = await request.formData();
     const file = formData.get('file') as File;
 
@@ -161,7 +170,7 @@ export async function POST(request: NextRequest) {
     // Pre-cargar la DB para comparar en memoria y no hacer miles de llamadas DB
     const { data: existingDeals, error: dbErr } = await supabase
       .from('deals')
-      .select('id, user_id, title, store, link, image_url')
+      .select('id, user_id, title, store, link, image_url, created_at')
       .in('store', storesInProcess);
 
     if (dbErr) {
@@ -227,34 +236,49 @@ export async function POST(request: NextRequest) {
       }
 
       // 2. Es un INSERT (Nuevo Deal)
-      // Lógica de Duplicados
-      
-      // Coincidencia exacta de LINK
-      const exactLink = existingDeals?.find(d => d.link === row.link);
-      if (exactLink) {
-        report.failed++;
-        report.errors.push({ 
-          row: row.rowNumber, 
-          title: row.title, 
-          issue: `Duplicado exacto por enlace detectado en la plataforma. Sugerimos "Editar oferta existente".` 
-        });
-        continue;
-      }
+      // Lógica de Duplicados (Solo para usuarios no administradores)
+      if (!isAdmin) {
+        // Coincidencia exacta de LINK
+        const exactLink = existingDeals?.find(d => d.link === row.link);
+        if (exactLink) {
+          // REGLA: Solo bloqueamos si el enlace fue publicado HOY. 
+          // Si es de días anteriores, se permite volver a publicar para moderación.
+          const createdDate = new Date(exactLink.created_at).toLocaleDateString();
+          const todayDate = new Date().toLocaleDateString();
+          
+          if (createdDate === todayDate) {
+            report.failed++;
+            report.errors.push({ 
+              row: row.rowNumber, 
+              title: row.title, 
+              issue: `Este enlace ya fue publicado el día de hoy. Para evitar spam, solo se permite republicar ofertas de días anteriores.` 
+            });
+            continue;
+          }
+        }
 
-      // Similitud de TÍTULO dentro de la MISMA TIENDA
-      const sameStoreDeals = existingDeals?.filter(d => d.store === row.store) || [];
-      const sameStoreTitles = sameStoreDeals.map(d => d.title);
-      
-      if (sameStoreTitles.length > 0) {
-        const matches = stringSimilarity.findBestMatch(row.title, sameStoreTitles);
-        if (matches.bestMatch.rating > 0.85) { // 85% similitud
-          report.failed++;
-          report.errors.push({ 
-            row: row.rowNumber, 
-            title: row.title, 
-            issue: `Posible duplicado. Se parece demasiado a "${matches.bestMatch.target}". Revisa si ya existe o cámbiale el nombre.`
-          });
-          continue;
+        // Similitud de TÍTULO dentro de la MISMA TIENDA
+        const sameStoreDeals = existingDeals?.filter(d => d.store === row.store) || [];
+        const sameStoreTitles = sameStoreDeals.map(d => d.title);
+        
+        if (sameStoreTitles.length > 0) {
+          const matches = stringSimilarity.findBestMatch(row.title, sameStoreTitles);
+          // Bloquear si el título es casi idéntico Y fue publicado hoy
+          if (matches.bestMatch.rating > 0.85) {
+            const similarTask = sameStoreDeals[matches.bestMatchIndex];
+            const createdDate = new Date(similarTask.created_at).toLocaleDateString();
+            const todayDate = new Date().toLocaleDateString();
+
+            if (createdDate === todayDate) {
+              report.failed++;
+              report.errors.push({ 
+                row: row.rowNumber, 
+                title: row.title, 
+                issue: `Título muy similar detectado hoy en la misma tienda. Verifica si ya existe.` 
+              });
+              continue;
+            }
+          }
         }
       }
 

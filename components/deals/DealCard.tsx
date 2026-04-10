@@ -318,17 +318,31 @@ export function DealCard({ deal, viewMode }: { deal: Deal; viewMode: 'grid' | 'l
                 </span>
               </>
             )}
-            {deal.shipping_type !== 'No aplica' && (
+            {viewMode === 'grid' && deal.shipping_type !== 'No aplica' && (
+              <div className={`flex items-center gap-1 sm:gap-1.5 border px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg text-[8px] sm:text-[9px] font-heading font-black uppercase tracking-wider ml-auto ${
+                deal.shipping_type === 'Gratis' 
+                  ? 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5' 
+                  : 'text-rose-500 border-rose-500/20 bg-rose-500/5'
+              }`}>
+                <Truck className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                <span className="ml-1">{deal.shipping_type}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Shipping Badge Row (Only for List View) */}
+          {viewMode === 'list' && deal.shipping_type !== 'No aplica' && (
+            <div className="flex mb-3">
               <div className={`flex items-center gap-1 sm:gap-1.5 border px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg text-[8px] sm:text-[9px] font-heading font-black uppercase tracking-wider ${
                 deal.shipping_type === 'Gratis' 
                   ? 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5' 
                   : 'text-rose-500 border-rose-500/20 bg-rose-500/5'
               }`}>
                 <Truck className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                <span className={`${viewMode === 'list' ? 'hidden sm:inline' : ''} ml-1`}>{deal.shipping_type}</span>
+                <span className="ml-1">{deal.shipping_type}</span>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* ── ACTIONS ROW ── */}

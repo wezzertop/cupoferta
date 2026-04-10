@@ -63,6 +63,7 @@ export function AdminModal() {
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<Tab>('moderation');
   const [selectedDeals, setSelectedDeals] = useState<string[]>([]);
+  const [failedTelegrams, setFailedTelegrams] = useState<string[]>([]);
   const [debugError, setDebugError] = useState<any>(null);
   
   const [dealPage, setDealPage] = useState(0);
@@ -189,8 +190,39 @@ export function AdminModal() {
 
   const handleModerationAction = async (ids: string[], action: string) => {
     setIsActionLoading(true);
-    const res = await fetch('/api/admin/moderation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealIds: ids, action }) });
-    if ((await res.json()).success) { setDeals(prev => prev.filter(d => !ids.includes(d.id))); setSelectedDeals([]); fetchData(); }
+    
+    // Procesar en bloques pequeños para evitar saturar el servidor y asegurar entrega en Telegram
+    const CHUNK_SIZE = 5;
+    for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+      const chunk = ids.slice(i, i + CHUNK_SIZE);
+      try {
+        const res = await fetch('/api/admin/moderation', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ dealIds: chunk, action }) 
+        });
+        const data = await res.json();
+        if (data.success) {
+          // Actualizar estado local progresivamente
+          setDeals(prev => prev.filter(d => !chunk.includes(d.id)));
+        } else {
+          console.error('Error en lote:', data.error);
+          setFailedTelegrams(prev => [...prev, ...chunk]);
+          alert(`⚠️ Error en un lote: ${data.message || 'Se marcarán para reintento'}`);
+        }
+        
+        // Pausa mayor entre lotes para respetar los límites de Telegram a largo plazo (800+ mensajes)
+        if (ids.length > CHUNK_SIZE) {
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      } catch (err) {
+        console.error('Error de red en moderación:', err);
+        setFailedTelegrams(prev => [...prev, ...chunk]);
+      }
+    }
+
+    setSelectedDeals([]);
+    fetchData();
     setIsActionLoading(false);
   };
 
@@ -312,7 +344,44 @@ export function AdminModal() {
               
               {tab === 'moderation' && (
                 <div className="space-y-3">
-                  {deals.length === 0 && search === '' && (
+                  {deals.length > 0 && (
+                    <div className={`p-4 rounded-2xl border flex items-center justify-between gap-4 mb-6 ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-slate-50 border-slate-100'}`}>
+                       <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500 border border-orange-500/10">
+                             <ShieldAlert className="w-5 h-5" />
+                          </div>
+                          <div>
+                             <h3 className="text-sm font-heading font-black leading-none">Aprobación Masiva</h3>
+                             <p className={`text-[9px] font-numbers font-bold mt-1 ${tc.muted}`}>Hay {deals.length} deals esperando revisión</p>
+                          </div>
+                       </div>
+                       <div className="flex gap-2">
+                          {failedTelegrams.length > 0 && (
+                             <button 
+                                onClick={() => {
+                                   const toRetry = [...failedTelegrams];
+                                   setFailedTelegrams([]);
+                                   handleModerationAction(toRetry, 'approve');
+                                }}
+                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-yellow-500 text-white text-[11px] font-heading font-black uppercase hover:bg-yellow-600 transition-all shadow-lg shadow-yellow-500/20"
+                             >
+                                <RefreshCw className="w-4 h-4" />
+                                Reintentar ({failedTelegrams.length})
+                             </button>
+                          )}
+                          <button 
+                            onClick={() => handleModerationAction(deals.map(d => d.id), 'approve')}
+                            disabled={isActionLoading}
+                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#009ea8] text-white text-[11px] font-heading font-black uppercase hover:bg-[#007b83] active:scale-95 transition-all shadow-lg shadow-[#009ea8]/20 disabled:opacity-50"
+                          >
+                             {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                             Aprobar Todo
+                          </button>
+                       </div>
+                    </div>
+                  )}
+
+                  {deals.length === 0 && (
                      <div className="text-center py-10 opacity-30 text-[11px] font-black uppercase tracking-widest">Cola vacía</div>
                   )}
                   {deals.filter(d => d.title.toLowerCase().includes(search.toLowerCase())).map(deal => (
