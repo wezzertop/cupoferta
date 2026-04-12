@@ -32,10 +32,16 @@ export async function POST(request: Request) {
     }
 
     if (action === 'approve') {
+      const validIds = dealIds.filter(id => !!id);
+      if (validIds.length === 0) {
+        return NextResponse.json({ error: 'No valid dealIds provided' }, { status: 400 });
+      }
+
       // 1. Actualizar estado en Supabase (En lotes para evitar error de URL demasiado larga)
       const UPDATE_CHUNK_SIZE = 100;
-      for (let i = 0; i < dealIds.length; i += UPDATE_CHUNK_SIZE) {
-        const chunk = dealIds.slice(i, i + UPDATE_CHUNK_SIZE);
+      for (let i = 0; i < validIds.length; i += UPDATE_CHUNK_SIZE) {
+        const chunk = validIds.slice(i, i + UPDATE_CHUNK_SIZE);
+        if (chunk.length === 0) continue;
         const { error: updateError } = await supabase
           .from('deals')
           .update({ status: 'approved' })
@@ -165,7 +171,9 @@ export async function POST(request: Request) {
                   });
                 }
                 
-                await supabase.from('deals').update({ telegram_posted: true }).eq('id', deal.id);
+                if (deal.id) {
+                  await supabase.from('deals').update({ telegram_posted: true }).eq('id', deal.id);
+                }
                 
                 // Retraso para evitar bans
                 if (idx < dealsData.length - 1) {
@@ -240,9 +248,11 @@ export async function POST(request: Request) {
       }
 
     } else if (action === 'reject') {
+      const validIds = dealIds.filter(id => !!id);
       const REJECT_CHUNK_SIZE = 100;
-      for (let i = 0; i < dealIds.length; i += REJECT_CHUNK_SIZE) {
-        const chunk = dealIds.slice(i, i + REJECT_CHUNK_SIZE);
+      for (let i = 0; i < validIds.length; i += REJECT_CHUNK_SIZE) {
+        const chunk = validIds.slice(i, i + REJECT_CHUNK_SIZE);
+        if (chunk.length === 0) continue;
         const { error: updateError } = await supabase
           .from('deals')
           .update({ status: 'rejected' })
@@ -271,9 +281,11 @@ export async function POST(request: Request) {
       else await processRejectNotifs();
 
     } else if (action === 'delete') {
+      const validIds = dealIds.filter(id => !!id);
       const DELETE_CHUNK_SIZE = 100;
-      for (let i = 0; i < dealIds.length; i += DELETE_CHUNK_SIZE) {
-        const chunk = dealIds.slice(i, i + DELETE_CHUNK_SIZE);
+      for (let i = 0; i < validIds.length; i += DELETE_CHUNK_SIZE) {
+        const chunk = validIds.slice(i, i + DELETE_CHUNK_SIZE);
+        if (chunk.length === 0) continue;
         const { error: deleteError } = await supabase
           .from('deals')
           .delete()

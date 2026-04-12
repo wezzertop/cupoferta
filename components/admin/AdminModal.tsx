@@ -203,10 +203,16 @@ export function AdminModal() {
   const handleModerationAction = async (ids: string[], action: string) => {
     setIsActionLoading(true);
     
+    const validIds = ids.filter(id => !!id);
+    if (validIds.length === 0) {
+      setIsActionLoading(false);
+      return;
+    }
+
     // Procesar en lotes masivos para asegurar la aprobación inmediata de todo
     const CHUNK_SIZE = 3000;
-    for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
-      const chunk = ids.slice(i, i + CHUNK_SIZE);
+    for (let i = 0; i < validIds.length; i += CHUNK_SIZE) {
+      const chunk = validIds.slice(i, i + CHUNK_SIZE);
       try {
         const res = await fetch('/api/admin/moderation', { 
           method: 'POST', 
