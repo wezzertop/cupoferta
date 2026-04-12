@@ -2,7 +2,7 @@
 import { useUIStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase/client';
 import { ChevronRight, ChevronUp, ChevronDown, Eye, Flame, BarChart3, ExternalLink, Truck, Calendar, RefreshCcw, Save, Trash2, Clock, Pause, Edit } from 'lucide-react';
-import { getDealImages, getRemainingTime, formatPrice, getCurrencyFlag, CURRENCIES, getFlagUrl } from '@/lib/utils';
+import { getDealImages, getRemainingTime, formatPrice, getCurrencyFlag, CURRENCIES, getFlagUrl, getStoreStyles } from '@/lib/utils';
 import { useEffect, useRef, useState } from 'react';
 import { CommentSection } from './CommentSection';
 import { VotesSection } from './VotesSection';
@@ -28,6 +28,7 @@ export function DealDrawer() {
   const [editPrice, setEditPrice] = useState('');
   const [editLink, setEditLink] = useState('');
   const [editCurrency, setEditCurrency] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const [timeLeft, setTimeLeft] = useState<string | null>(getRemainingTime(selectedDeal?.expires_at));
 
@@ -60,6 +61,15 @@ export function DealDrawer() {
       setIsDescExpanded(false);
       setIsEditing(false);
       setIsRenewing(false);
+
+      // Check for admin role
+      if (user) {
+        supabase.from('profiles').select('role').eq('id', user.id).single()
+          .then(({ data }) => {
+             if (data?.role === 'admin') setIsAdmin(true);
+             else setIsAdmin(false);
+          });
+      }
 
       // Add view
       const viewKey = `viewed_${selectedDeal.id}`;
@@ -150,10 +160,18 @@ export function DealDrawer() {
      if (!confirm("¿Estás seguro de que quieres eliminar esta oferta permanentemente?")) return;
      setIsDeleting(true);
      
-     const { error } = await supabase.from('deals').delete().eq('id', selectedDeal.id);
+     // 1. Intentar borrar votos y comentarios primero (en caso de que no haya CASCADE en BD)
+     await supabase.from('deal_votes').delete().eq('deal_id', selectedDeal.id);
+     await supabase.from('comments').delete().eq('deal_id', selectedDeal.id);
+     
+     // 2. Borrar la oferta propia
+     const { error, count } = await supabase.from('deals').delete({ count: 'exact' }).eq('id', selectedDeal.id);
+     
      if (error) {
        console.error("Error al eliminar:", error);
-       alert("Error al eliminar la oferta. Revisa si tienes permisos.");
+       alert("Error al eliminar la oferta: " + error.message);
+     } else if (count === 0) {
+       alert("No se eliminó ninguna fila. Esto suele pasar por falta de permisos (RLS) en la base de datos.");
      } else {
        alert("Oferta eliminada con éxito.");
        setSelectedDeal(null);
@@ -270,7 +288,7 @@ export function DealDrawer() {
                    </div>
                    <div className="flex-1 space-y-4">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="bg-[#009ea8]/10 text-[#009ea8] text-[9px] font-heading font-black px-2 py-1 rounded-lg tracking-wider inline-block uppercase border border-[#009ea8]/20">{selectedDeal.store}</span>
+                        <span className={`${getStoreStyles(selectedDeal.store, isDarkMode).bg} ${getStoreStyles(selectedDeal.store, isDarkMode).text} ${getStoreStyles(selectedDeal.store, isDarkMode).border} text-[9px] font-heading font-black px-2 py-1 rounded-lg tracking-wider inline-block uppercase border`}>{selectedDeal.store}</span>
                         <span className={`text-[10px] font-heading font-black px-2 py-1 rounded-lg border shadow-sm transition-all duration-300 ${timeLeft ? 'bg-red-500/10 text-red-500 border-red-500/20 animate-pulse' : (isDarkMode ? 'bg-white/5 border-white/5 text-gray-400' : 'bg-slate-50 border-slate-200 text-slate-500')}`}>
                           {getTimeAgo(selectedDeal.created_at)}
                         </span>
@@ -315,8 +333,8 @@ export function DealDrawer() {
                         </a>
                       </div>
 
-                      {/* Sección de Gestión para el Dueño */}
-                      {isOwner && (
+                      {/* Sección de Gestión para el Dueño o Admin */}
+                      {(isOwner || isAdmin) && (
                         <div className={`mt-6 p-4 rounded-xl border-2 border-dashed animate-in fade-in zoom-in-95 duration-300 ${isDarkMode ? 'bg-[#009ea8]/5 border-[#009ea8]/20' : 'bg-[#e0f2f1]/30 border-teal-100'}`}>
                            <div className="flex items-center gap-3 mb-4">
                               <div className="w-10 h-10 rounded-full bg-[#009ea8] text-white flex items-center justify-center shadow-lg shadow-[#009ea8]/20">

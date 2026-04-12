@@ -1,15 +1,16 @@
 'use client';
 import { useUIStore } from '@/lib/store';
-import { Menu, Flame, Sun, Moon, Bell, Plus, MessageCircle, Clock, Ticket, LogOut, Search, Settings, CheckCircle2, ShieldCheck, User } from 'lucide-react';
+import { Menu, Flame, Sun, Moon, Bell, Plus, MessageCircle, Clock, Ticket, LogOut, Search, Settings, CheckCircle2, ShieldCheck, User, Store } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { getAvatarUrl } from '@/lib/utils';
+import { getAvatarUrl, getCookie } from '@/lib/utils';
+import { Sparkles } from 'lucide-react';
 
 const colors = { accent: '#009ea8' };
 const btnEffect = 'transition-all duration-200 active:scale-95';
 
 export function Header() {
-  const { isDarkMode, toggleDarkMode, setSidebarOpen, user, setAuthModalOpen, setNewDealModalOpen, setSearchModalOpen, setProfileModalOpen, setProfileUserId, setProfileTab, activeTab, setActiveTab, setSettingsModalOpen, setSettingsTab, setActiveFilter } = useUIStore();
+  const { isDarkMode, toggleDarkMode, setSidebarOpen, user, setAuthModalOpen, setNewDealModalOpen, setSearchModalOpen, setProfileModalOpen, setProfileUserId, setProfileTab, activeTab, setActiveTab, setSettingsModalOpen, setSettingsTab, setActiveFilter, hasConsent } = useUIStore();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const lastScrollY = useRef(0);
@@ -286,12 +287,16 @@ export function Header() {
         </div>
       </div>
 
-      <div className={`hidden md:block ${tc.tab}`}>
+      <div className={tc.tab}>
         <div className="flex items-center gap-1 px-4 md:px-6 max-w-[1400px] mx-auto overflow-x-auto hide-scrollbar">
-          <TabItem active={activeTab === 'hot'} onClick={() => setActiveTab('hot')} icon={<Flame className="w-3.5 h-3.5" />} label="Más Calientes" isDarkMode={isDarkMode} />
-          <TabItem active={activeTab === 'new'} onClick={() => setActiveTab('new')} icon={<Clock className="w-3.5 h-3.5" />} label="Nuevas" isDarkMode={isDarkMode} />
-          <TabItem active={activeTab === 'commented'} onClick={() => setActiveTab('commented')} icon={<MessageCircle className="w-3.5 h-3.5" />} label="Comentadas" isDarkMode={isDarkMode} />
-          <TabItem active={activeTab === 'coupons'} onClick={() => setActiveTab('coupons')} icon={<Ticket className="w-3.5 h-3.5" />} label="Cupones" isDarkMode={isDarkMode} />
+          <TabItem active={activeTab === 'hot'} onClick={() => { setActiveTab('hot'); setActiveFilter('home'); }} icon={<Flame className="w-3.5 h-3.5" />} label="Más Calientes" isDarkMode={isDarkMode} />
+          {hasConsent && (
+            <TabItem active={activeTab === 'recommended'} onClick={() => { setActiveTab('recommended'); setActiveFilter('home'); }} icon={<Sparkles className="w-3.5 h-3.5" />} label="Para ti" isDarkMode={isDarkMode} />
+          )}
+          <TabItem active={activeTab === 'new'} onClick={() => { setActiveTab('new'); setActiveFilter('home'); }} icon={<Clock className="w-3.5 h-3.5" />} label="Nuevas" isDarkMode={isDarkMode} />
+          <TabItem active={activeTab === 'commented'} onClick={() => { setActiveTab('commented'); setActiveFilter('home'); }} icon={<MessageCircle className="w-3.5 h-3.5" />} label="Comentadas" isDarkMode={isDarkMode} />
+          <TabItem active={activeTab === 'coupons'} onClick={() => { setActiveTab('coupons'); setActiveFilter('home'); }} icon={<Ticket className="w-3.5 h-3.5" />} label="Cupones" isDarkMode={isDarkMode} />
+          <TabItem active={activeTab === 'stores'} onClick={() => { setActiveTab('stores'); setActiveFilter('home'); }} icon={<Store className="w-3.5 h-3.5" />} label="Tiendas" isDarkMode={isDarkMode} />
         </div>
       </div>
     </header>

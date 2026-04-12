@@ -9,6 +9,8 @@ export const metadata: Metadata = {
   description: 'Nunca más pagues el precio completo.',
 };
 
+import { CookieConsent } from '@/components/layout/CookieConsent';
+
 export default function RootLayout({
   children,
 }: {
@@ -17,7 +19,10 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className="antialiased overflow-x-hidden font-body transition-colors duration-300">
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <CookieConsent />
+        </Providers>
       </body>
     </html>
   );

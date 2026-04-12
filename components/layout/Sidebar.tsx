@@ -2,7 +2,8 @@
 import { useState, useEffect } from 'react';
 import { useUIStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase/client';
-import { X, Flame, Plus, Home, Tag, ShoppingBag, Bookmark, BellPlus, User, Settings, LogOut, Gift, ChevronDown, ShieldCheck, MessageCircle, Clock } from 'lucide-react';
+import { X, Flame, Plus, Home, Tag, ShoppingBag, Bookmark, BellPlus, User, Settings, LogOut, Gift, ChevronDown, ChevronUp, ShieldCheck, MessageCircle, Clock, Store } from 'lucide-react';
+import { updatePreferences } from '@/lib/utils';
 
 const colors = {
   accent: '#009ea8',
@@ -10,8 +11,9 @@ const colors = {
 const btnEffect = "transition-all duration-200 active:scale-95";
 
 export function Sidebar() {
-  const { isSidebarOpen, setSidebarOpen, isDarkMode, activeFilter, setActiveFilter, categoryFilter, setCategoryFilter, setNewDealModalOpen, user, setAuthModalOpen, setProfileModalOpen, setProfileUserId, setProfileTab, setAdminModalOpen, setSettingsModalOpen, setSettingsTab } = useUIStore();
+  const { isSidebarOpen, setSidebarOpen, isDarkMode, activeFilter, setActiveFilter, categoryFilter, setCategoryFilter, storeFilter, setStoreFilter, activeTab, setActiveTab, setNewDealModalOpen, user, setAuthModalOpen, setProfileModalOpen, setProfileUserId, setProfileTab, setAdminModalOpen, setSettingsModalOpen, setSettingsTab, officialStores, setOfficialStores, setFiltersModalOpen } = useUIStore();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showAllStores, setShowAllStores] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -29,6 +31,18 @@ export function Sidebar() {
       setIsAdmin(false);
     }
   }, [user]);
+
+  // Load official stores
+  useEffect(() => {
+    if (officialStores.length === 0) {
+      fetch('/api/admin/stores')
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.stores) setOfficialStores(data.stores);
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   const handleProfileClick = (tab: 'deals' | 'saved') => {
     if (!user) {
@@ -93,9 +107,9 @@ export function Sidebar() {
             <SidebarItem
               icon={<Home className="w-5 h-5" />}
               label="Inicio"
-              isActive={activeFilter === 'home' && !categoryFilter}
+              isActive={activeFilter === 'home' && !categoryFilter && !storeFilter}
               themeClasses={themeClasses}
-              onClick={() => { setActiveFilter('home'); setCategoryFilter(null); setSidebarOpen(false); }}
+              onClick={() => { setActiveFilter('home'); setCategoryFilter(null); setStoreFilter(null); setSidebarOpen(false); }}
             />
             <SidebarItem 
               icon={<Flame className="w-5 h-5" />}
@@ -109,6 +123,13 @@ export function Sidebar() {
               themeClasses={themeClasses}
               onClick={() => { setActiveFilter('home'); setSidebarOpen(false); }}
             />
+            <SidebarItem 
+              icon={<Store className="w-5 h-5" />}
+              label="Tiendas Oficiales"
+              isActive={activeTab === 'stores'}
+              themeClasses={themeClasses}
+              onClick={() => { setActiveTab('stores'); setActiveFilter('home'); setSidebarOpen(false); }}
+            />
           </div>
 
           {/* Categories */}
@@ -121,18 +142,85 @@ export function Sidebar() {
                 label={cat.name}
                 isActive={categoryFilter === cat.name}
                 themeClasses={themeClasses}
-                onClick={() => { setCategoryFilter(cat.name); setActiveFilter('category'); setSidebarOpen(false); }}
+                onClick={() => { 
+                  setCategoryFilter(cat.name); 
+                  setActiveFilter('category'); 
+                  setSidebarOpen(false); 
+                  updatePreferences(cat.name);
+                }}
               />
             ))}
           </div>
 
-          {/* Popular Stores */}
+          {/* Official Stores */}
           <div className="space-y-1">
-            <p className={`px-3 mb-2 text-[10px] font-black uppercase tracking-widest ${themeClasses.textMuted} opacity-50`}>Tiendas Destacadas</p>
-            <SidebarItem icon={<Tag className="w-4 h-4 text-orange-500" />} label="Amazon" themeClasses={themeClasses} onClick={() => {}} />
-            <SidebarItem icon={<Tag className="w-4 h-4 text-red-500" />} label="AliExpress" themeClasses={themeClasses} onClick={() => {}} />
-            <SidebarItem icon={<Tag className="w-4 h-4 text-blue-500" />} label="Mercado Libre" themeClasses={themeClasses} onClick={() => {}} />
-            <SidebarItem icon={<Tag className="w-4 h-4 text-yellow-500" />} label="Walmart" themeClasses={themeClasses} onClick={() => {}} />
+            <p className={`px-3 mb-2 text-[10px] font-black uppercase tracking-widest ${themeClasses.textMuted} opacity-50`}>Tiendas Oficiales</p>
+            {(() => {
+              const activeStores = officialStores.filter(s => s.is_active);
+              const VISIBLE_COUNT = 6;
+              const visibleStores = showAllStores ? activeStores : activeStores.slice(0, VISIBLE_COUNT);
+              const hiddenCount = activeStores.length - VISIBLE_COUNT;
+              
+              return (
+                <>
+                  {visibleStores.map(store => (
+                    <button
+                      key={store.id}
+                      onClick={() => { 
+                        setStoreFilter(store.name);
+                        setActiveFilter('store');
+                        setSidebarOpen(false); 
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-[13px] font-heading font-semibold transition-all group active:scale-[0.98] ${
+                        storeFilter === store.name
+                          ? 'text-white'
+                          : `${themeClasses.textMuted} ${themeClasses.sidebarHover}`
+                      }`}
+                      style={storeFilter === store.name ? { backgroundColor: store.color_primary + '30' } : {}}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div 
+                          className="w-5 h-5 rounded-full overflow-hidden border flex items-center justify-center shrink-0"
+                          style={{ borderColor: store.color_primary, backgroundColor: store.logo_url ? 'white' : store.color_primary }}
+                        >
+                          {store.logo_url ? (
+                            <img src={store.logo_url} alt="" className="w-full h-full object-cover rounded-full" />
+                          ) : (
+                            <span className="text-[7px] font-black" style={{ color: store.color_text }}>
+                              {store.name.charAt(0)}
+                            </span>
+                          )}
+                        </div>
+                        <span className="group-hover:text-inherit">{store.name}</span>
+                      </div>
+                      <div 
+                        className="w-2 h-2 rounded-full shrink-0" 
+                        style={{ backgroundColor: store.color_primary }}
+                      />
+                    </button>
+                  ))}
+                  
+                  {/* Toggle button: Ver todas / Ver menos */}
+                  {activeStores.length > VISIBLE_COUNT && (
+                    <button
+                      onClick={() => setShowAllStores(!showAllStores)}
+                      className={`w-full flex items-center justify-center gap-2 px-3 py-2 mt-1 rounded-xl text-[11px] font-heading font-bold transition-all active:scale-[0.98] ${
+                        isDarkMode 
+                          ? 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/5' 
+                          : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700 border border-slate-100'
+                      }`}
+                    >
+                      <Store className="w-3.5 h-3.5" />
+                      {showAllStores ? (
+                        <>Ver menos <ChevronUp className="w-3 h-3" /></>
+                      ) : (
+                        <>Ver todas las tiendas ({activeStores.length}) <ChevronDown className="w-3 h-3" /></>
+                      )}
+                    </button>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           {/* Help & Support */}

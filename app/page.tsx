@@ -11,7 +11,7 @@ import { ProfileModal } from '@/components/layout/ProfileModal';
 import { AdminModal } from '@/components/admin/AdminModal';
 import { FiltersModal } from '@/components/deals/FiltersModal';
 import { SettingsModal } from '@/components/layout/SettingsModal';
-import { LayoutGrid, List, SlidersHorizontal, Megaphone, Loader2, Search, Plus } from 'lucide-react';
+import { LayoutGrid, List, SlidersHorizontal, Megaphone, Loader2, Search, Plus, X, Store } from 'lucide-react';
 import { MobileNavbar } from '@/components/layout/MobileNavbar';
 import { ReportModal } from '@/components/modals/ReportModal';
 import { Footer } from '@/components/layout/Footer';
@@ -23,6 +23,7 @@ import { useUIStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase/client';
 import { BannerAd } from '@/components/ads/BannerAd';
 import { NativeAd } from '@/components/ads/NativeAd';
+import { getCookie } from '@/lib/utils';
 
 /* ============================================================
    COMPONENTE: Banner Publicitario
@@ -83,6 +84,62 @@ function DealSkeleton({ viewMode, isDarkMode }: { viewMode: 'grid' | 'list', isD
 }
 
 /* ============================================================
+   COMPONENTE: Tarjeta de Tienda
+   ============================================================ */
+function StoreDisplayCard({ store, isDarkMode, onSelect }: { store: any, isDarkMode: boolean, onSelect: () => void }) {
+  const bg = isDarkMode ? 'bg-[#141414] border-white/5' : 'bg-white border-slate-100 shadow-sm';
+  
+  return (
+    <button 
+      onClick={onSelect}
+      className={`group relative flex flex-col items-center text-center p-6 rounded-[2.5rem] border transition-all hover:-translate-y-2 hover:shadow-2xl active:scale-95 overflow-hidden ${bg}`}
+      style={{ borderColor: store.color_primary + '30' }}
+    >
+      {/* Background Decor */}
+      <div 
+        className="absolute top-0 right-0 w-32 h-32 -mr-16 -mt-16 rounded-full opacity-10 blur-3xl transition-opacity group-hover:opacity-20"
+        style={{ backgroundColor: store.color_primary }}
+      />
+      
+      {/* Logo */}
+      <div 
+        className="w-24 h-24 rounded-full flex items-center justify-center border-4 shadow-xl mb-4 transition-transform group-hover:scale-110 z-10"
+        style={{ 
+          borderColor: store.color_primary,
+          backgroundColor: store.logo_url ? 'white' : store.color_primary,
+          boxShadow: `0 12px 24px ${store.color_primary}30`
+        }}
+      >
+        {store.logo_url ? (
+          <img src={store.logo_url} alt={store.name} className="w-full h-full object-cover rounded-full" />
+        ) : (
+          <span className="text-3xl font-heading font-black" style={{ color: store.color_text }}>{store.name.charAt(0)}</span>
+        )}
+      </div>
+
+      <h3 className={`text-xl font-heading font-black mb-1 ${isDarkMode ? 'text-white' : 'text-slate-900 group-hover:text-[#009ea8]'}`}>{store.name}</h3>
+      <p className={`text-xs font-body mb-4 ${isDarkMode ? 'text-gray-500' : 'text-slate-500'} line-clamp-2`}>{store.description || 'Tienda oficial con las mejores ofertas verificadas.'}</p>
+      
+      <div className="flex items-center gap-2 mt-auto">
+        <span 
+          className="px-3 py-1 rounded-full text-[10px] font-heading font-black uppercase tracking-wider border"
+          style={{ 
+            backgroundColor: store.color_primary + '15',
+            borderColor: store.color_primary + '30',
+            color: store.color_primary
+          }}
+        >
+          {store.deal_count || 0} Ofertas
+        </span>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isDarkMode ? 'bg-white/5 text-gray-400 group-hover:bg-[#009ea8] group-hover:text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-[#009ea8] group-hover:text-white'}`}>
+           <Plus className="w-4 h-4" />
+        </div>
+      </div>
+    </button>
+  );
+}
+
+/* ============================================================
    PÁGINA PRINCIPAL
    ============================================================ */
 export default function Home() {
@@ -95,7 +152,7 @@ export default function Home() {
   const [isMobile, setIsMobile] = useState(false);
   const PAGE_SIZE = 12;
 
-  const { isDarkMode, setAuthModalOpen, user, setUser, activeFilter, categoryFilter, activeTab, setSearchModalOpen, setNewDealModalOpen, setFiltersModalOpen, setSelectedDeal, setDrawerMode } = useUIStore();
+  const { isDarkMode, setAuthModalOpen, user, setUser, activeFilter, setActiveFilter, categoryFilter, setCategoryFilter, storeFilter, setStoreFilter, activeTab, setActiveTab, setSearchModalOpen, setNewDealModalOpen, setFiltersModalOpen, setSelectedDeal, setDrawerMode, officialStores, setOfficialStores } = useUIStore();
   const supabase = createClient();
   const searchParams = useSearchParams();
 
@@ -124,6 +181,18 @@ export default function Home() {
     supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user || null));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user || null));
     return () => subscription.unsubscribe();
+  }, []);
+
+  // ── Load Official Stores Cache ──────────────────────────────
+  useEffect(() => {
+    if (officialStores.length === 0) {
+      fetch('/api/admin/stores')
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.stores) setOfficialStores(data.stores);
+        })
+        .catch(() => {});
+    }
   }, []);
 
   const tc = {
@@ -161,7 +230,7 @@ export default function Home() {
     setDeals([]);
     setHasMore(true);
     fetchDeals(0, true);
-  }, [activeFilter, categoryFilter, activeTab]);
+  }, [activeFilter, categoryFilter, storeFilter, activeTab]);
 
   // Handle user logout/login reload
   useEffect(() => {
@@ -172,8 +241,26 @@ export default function Home() {
       fetchDeals(0, true);
     }
   }, [user?.id]);
+  
+  // Auto-switch to recommended if consent and prefs exist
+  useEffect(() => {
+    if (activeFilter === 'home' && activeTab === 'hot' && getCookie('cookie_consent') === 'true') {
+      const prefsStr = getCookie('user_preferences');
+      if (prefsStr) {
+        try {
+          const prefs = JSON.parse(prefsStr);
+          if (prefs.length > 0) setActiveTab('recommended');
+        } catch (e) {}
+      }
+    }
+  }, [activeFilter]);
 
   async function fetchDeals(pageNumber: number, isInitial: boolean = false) {
+    if (activeTab === 'stores') {
+      setLoading(false);
+      setLoadingMore(false);
+      return;
+    }
     if (isInitial) setLoading(true);
     else setLoadingMore(true);
 
@@ -195,15 +282,20 @@ export default function Home() {
       } else {
         query = supabase.from('deals').select('*, profiles!deals_user_id_fkey(username, avatar_url)');
 
-        // Filtro de expiración y estado para vistas públicas
-        if (activeFilter === 'category' && categoryFilter) {
-          query = query.eq('category', categoryFilter).eq('status', 'approved');
-          query = query.or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
-        } else if (activeFilter === 'profile' && user) {
-          query = query.eq('user_id', user.id);
-        } else if (activeFilter === 'home') {
+        // Base filters for public views
+        if (activeFilter !== 'profile' && activeFilter !== 'saved') {
           query = query.eq('status', 'approved');
           query = query.or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
+          
+          if (categoryFilter) {
+            query = query.eq('category', categoryFilter);
+          }
+          
+          if (storeFilter) {
+            query = query.ilike('store', `%${storeFilter}%`);
+          }
+        } else if (activeFilter === 'profile' && user) {
+          query = query.eq('user_id', user.id);
         }
 
         // Apply sorting at DB level for efficiency with secondary sort for Cursor Pagination
@@ -215,6 +307,19 @@ export default function Home() {
           query = query.order('comments_count', { ascending: false }).order('id', { ascending: false });
         } else if (activeTab === 'coupons') {
           query = query.ilike('title', '%cupon%').order('created_at', { ascending: false }).order('id', { ascending: false });
+        } else if (activeTab === 'recommended') {
+          const prefsStr = getCookie('user_preferences');
+          let prefs: string[] = [];
+          if (prefsStr) {
+            try { prefs = JSON.parse(prefsStr); } catch (e) { prefs = []; }
+          }
+          
+          if (prefs.length > 0) {
+            query = query.in('category', prefs).order('created_at', { ascending: false }).order('id', { ascending: false });
+          } else {
+            // Fallback to hot if no preferences
+            query = query.order('hot_score', { ascending: false }).order('id', { ascending: false });
+          }
         } else {
           query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
         }
@@ -270,7 +375,11 @@ export default function Home() {
       if (isInitial) {
         setDeals(newDeals);
       } else {
-        setDeals(prev => [...prev, ...newDeals]);
+        setDeals(prev => {
+           const combined = [...prev, ...newDeals];
+           // Deduplicar por ID para evitar problemas de paginación o duplicados en respuesta
+           return Array.from(new Map(combined.map(item => [item['id'], item])).values());
+        });
       }
 
       setHasMore(newDeals.length === PAGE_SIZE);
@@ -288,12 +397,28 @@ export default function Home() {
     fetchDeals(nextPage);
   };
 
-  const pageTitle = {
-    saved: 'Ofertas Guardadas',
-    profile: 'Mis Publicaciones',
-    category: `Categoría: ${categoryFilter || ''}`,
-    home: 'Ofertas Destacadas',
-  }[activeFilter] ?? 'Ofertas Destacadas';
+  let pageTitle = 'Ofertas Destacadas';
+  if (activeFilter === 'saved') pageTitle = 'Ofertas Guardadas';
+  else if (activeFilter === 'profile') pageTitle = 'Mis Publicaciones';
+  else if (activeTab === 'stores') pageTitle = 'Tiendas Oficiales';
+  else if (storeFilter && categoryFilter) pageTitle = `${storeFilter}: ${categoryFilter}`;
+  else if (storeFilter) pageTitle = `Tienda: ${storeFilter}`;
+  else if (categoryFilter) pageTitle = `Categoría: ${categoryFilter}`;
+
+  // Find the active official store data for the store header
+  const activeStoreData = (activeFilter === 'store' || activeFilter === 'category' || activeFilter === 'home') && storeFilter 
+    ? officialStores.find((s: any) => s.name.toLowerCase() === storeFilter.toLowerCase())
+    : null;
+
+  // Helper to clear all filters
+  const clearStoreFilter = () => {
+    setStoreFilter(null);
+    if (categoryFilter) {
+      setActiveFilter('category');
+    } else {
+      setActiveFilter('home');
+    }
+  };
 
   // ── Grid column classes responsive ─────────────────────────
   const gridCols = viewMode === 'grid'
@@ -361,12 +486,110 @@ export default function Home() {
           </div>
         </div>
 
+
+        {/* ── STORE HEADER BANNER ── */}
+        {activeStoreData && (
+          <div 
+            className="mb-6 rounded-3xl border overflow-hidden relative animate-in slide-in-from-bottom-2 duration-300"
+            style={{ borderColor: activeStoreData.color_primary + '40' }}
+          >
+            {/* Background gradient */}
+            <div 
+              className="absolute inset-0 opacity-10"
+              style={{ 
+                background: `linear-gradient(135deg, ${activeStoreData.color_primary}, ${activeStoreData.color_secondary || activeStoreData.color_primary}80, transparent)` 
+              }}
+            />
+            <div className={`relative flex items-center gap-5 p-5 sm:p-6 ${isDarkMode ? 'bg-black/40' : 'bg-white/60'} backdrop-blur-sm`}>
+              {/* Store Logo */}
+              <div 
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center shrink-0 border-[3px] overflow-hidden shadow-xl"
+                style={{ 
+                  borderColor: activeStoreData.color_primary,
+                  backgroundColor: activeStoreData.logo_url ? 'white' : activeStoreData.color_primary,
+                  boxShadow: `0 8px 32px ${activeStoreData.color_primary}40`
+                }}
+              >
+                {activeStoreData.logo_url ? (
+                  <img src={activeStoreData.logo_url} alt={activeStoreData.name} className="w-full h-full object-cover rounded-full" />
+                ) : (
+                  <span 
+                    className="text-2xl sm:text-3xl font-heading font-black"
+                    style={{ color: activeStoreData.color_text }}
+                  >
+                    {activeStoreData.name.charAt(0)}
+                  </span>
+                )}
+              </div>
+              {/* Store Info */}
+              <div className="flex-1 min-w-0">
+                <h2 className={`text-xl sm:text-2xl font-heading font-black ${tc.textStrong}`}>
+                  {activeStoreData.name}
+                </h2>
+                {activeStoreData.description && (
+                  <p className={`text-xs sm:text-sm font-body mt-1 ${tc.textMuted}`}>
+                    {activeStoreData.description}
+                  </p>
+                )}
+                <div className="flex items-center gap-3 mt-2">
+                  <span 
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-heading font-black uppercase tracking-wider border"
+                    style={{ 
+                      backgroundColor: activeStoreData.color_primary + '15',
+                      borderColor: activeStoreData.color_primary + '30',
+                      color: activeStoreData.color_primary
+                    }}
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: activeStoreData.color_primary }} />
+                    Tienda Oficial
+                  </span>
+                  {activeStoreData.deal_count > 0 && (
+                    <span className={`text-[10px] font-numbers font-bold ${tc.textMuted}`}>
+                      {activeStoreData.deal_count} ofertas activas
+                    </span>
+                  )}
+                </div>
+              </div>
+              {/* Brand color pill */}
+              <div 
+                className="hidden sm:flex w-3 h-16 rounded-full shrink-0"
+                style={{ 
+                  background: `linear-gradient(to bottom, ${activeStoreData.color_primary}, ${activeStoreData.color_secondary || activeStoreData.color_primary})` 
+                }}
+              />
+              <button
+                onClick={clearStoreFilter}
+                className={`absolute top-3 right-3 p-2 rounded-xl transition-all active:scale-90 ${isDarkMode ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-black/5 hover:bg-black/10 text-slate-600'}`}
+                title="Quitar filtro de tienda"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ── MAIN LAYOUT: Feed + Sidebar Ad ── */}
         <div className="flex flex-col lg:flex-row gap-8 items-start mb-20 md:mb-12">
 
           {/* ── DEAL FEED (3/4 on lg+) ── */}
           <section className="w-full lg:w-3/4 flex-1 min-w-0 min-h-[600px]">
-            {loading ? (
+            {activeTab === 'stores' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {officialStores.filter(s => s.is_active).map(store => (
+                  <StoreDisplayCard 
+                    key={store.id} 
+                    store={store} 
+                    isDarkMode={isDarkMode} 
+                    onSelect={() => { 
+                      setStoreFilter(store.name); 
+                      setActiveFilter('store'); 
+                      setActiveTab('hot'); 
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }} 
+                  />
+                ))}
+              </div>
+            ) : loading ? (
               <div className={gridCols}>
                 {[1, 2, 3, 4, 5, 6].map(i => (
                   <DealSkeleton key={i} viewMode={viewMode} isDarkMode={isDarkMode} />

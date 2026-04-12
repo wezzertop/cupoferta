@@ -5,9 +5,9 @@ import { createClient } from '@/lib/supabase/client';
 import { 
   X, ShieldAlert, Trash2, UserMinus, Search, Loader2, CheckCircle, 
   AlertTriangle, Check, Ban, Send, Settings, Eye, ExternalLink, 
-  RefreshCw, History, Flag, LayoutGrid, ListFilter
+  RefreshCw, History, Flag, LayoutGrid, ListFilter, Store, Plus, Edit3, Power, Upload, Palette
 } from 'lucide-react';
-import { getDealImages, formatPrice, getCurrencyFlag } from '@/lib/utils';
+import { getDealImages, formatPrice, getCurrencyFlag, getStoreStyles, getStoreInlineStyles } from '@/lib/utils';
 
 // Icono de X (Twitter) — SVG inline
 const XIcon = ({ className }: { className?: string }) => (
@@ -45,10 +45,10 @@ function shareOnX(deal: any) {
   window.open(tweetUrl, '_blank', 'width=600,height=550,scrollbars=yes');
 }
 
-type Tab = 'moderation' | 'deals' | 'users' | 'telegram' | 'history' | 'reports';
+type Tab = 'moderation' | 'deals' | 'users' | 'telegram' | 'history' | 'reports' | 'stores';
 
 export function AdminModal() {
-  const { adminModalOpen, setAdminModalOpen, isDarkMode, user } = useUIStore();
+  const { adminModalOpen, setAdminModalOpen, isDarkMode, user, officialStores } = useUIStore();
   const [deals, setDeals] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [reports, setReports] = useState<any[]>([]);
@@ -65,6 +65,14 @@ export function AdminModal() {
   const [selectedDeals, setSelectedDeals] = useState<string[]>([]);
   const [failedTelegrams, setFailedTelegrams] = useState<string[]>([]);
   const [debugError, setDebugError] = useState<any>(null);
+  
+  // Stores management state
+  const [storesList, setStoresList] = useState<any[]>([]);
+  const [editingStore, setEditingStore] = useState<any>(null);
+  const [newStore, setNewStore] = useState({
+    name: '', color_primary: '#009ea8', color_secondary: '', color_text: '#ffffff',
+    color_border: '', logo_url: '', description: '', website_url: ''
+  });
   
   const [dealPage, setDealPage] = useState(0);
   const [userPage, setUserPage] = useState(0);
@@ -165,6 +173,10 @@ export function AdminModal() {
       } else if (tab === 'history') {
         const { data: logsData } = await supabase.from('moderation_logs').select('*, admin:profiles!admin_id(username)').order('created_at', { ascending: false }).limit(100);
         setLogs(logsData || []);
+      } else if (tab === 'stores') {
+        const res = await fetch('/api/admin/stores');
+        const data = await res.json();
+        if (data.success) setStoresList(data.stores || []);
       }
     } catch (error: any) { 
        console.error(error); 
@@ -191,8 +203,8 @@ export function AdminModal() {
   const handleModerationAction = async (ids: string[], action: string) => {
     setIsActionLoading(true);
     
-    // Procesar en bloques pequeños para evitar saturar el servidor y asegurar entrega en Telegram
-    const CHUNK_SIZE = 5;
+    // Procesar en lotes masivos para asegurar la aprobación inmediata de todo
+    const CHUNK_SIZE = 3000;
     for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
       const chunk = ids.slice(i, i + CHUNK_SIZE);
       try {
@@ -208,7 +220,7 @@ export function AdminModal() {
         } else {
           console.error('Error en lote:', data.error);
           setFailedTelegrams(prev => [...prev, ...chunk]);
-          alert(`⚠️ Error en un lote: ${data.message || 'Se marcarán para reintento'}`);
+          alert(`⚠️ Error en un lote: ${data.message || data.error || 'Se marcarán para reintento'}`);
         }
         
         // Pausa mayor entre lotes para respetar los límites de Telegram a largo plazo (800+ mensajes)
@@ -267,6 +279,81 @@ export function AdminModal() {
     else alert('❌ Error al guardar: ' + error.message);
   };
 
+  // Store CRUD handlers
+  const handleCreateStore = async () => {
+    if (!newStore.name.trim()) return alert('El nombre es obligatorio');
+    setIsActionLoading(true);
+    try {
+      const res = await fetch('/api/admin/stores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', store: newStore })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStoresList(prev => [...prev, data.store]);
+        setNewStore({ name: '', color_primary: '#009ea8', color_secondary: '', color_text: '#ffffff', color_border: '', logo_url: '', description: '', website_url: '' });
+        alert('✅ Tienda creada exitosamente');
+      } else {
+        alert('❌ Error: ' + data.error);
+      }
+    } catch (e: any) { alert('❌ Error: ' + e.message); }
+    setIsActionLoading(false);
+  };
+
+  const handleUpdateStore = async (store: any) => {
+    setIsActionLoading(true);
+    try {
+      const res = await fetch('/api/admin/stores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update', store })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStoresList(prev => prev.map(s => s.id === store.id ? data.store : s));
+        setEditingStore(null);
+        alert('✅ Tienda actualizada');
+      } else {
+        alert('❌ Error: ' + data.error);
+      }
+    } catch (e: any) { alert('❌ Error: ' + e.message); }
+    setIsActionLoading(false);
+  };
+
+  const handleDeleteStore = async (storeId: string) => {
+    if (!confirm('¿Eliminar esta tienda permanentemente?')) return;
+    setIsActionLoading(true);
+    try {
+      const res = await fetch('/api/admin/stores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', store: { id: storeId } })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStoresList(prev => prev.filter(s => s.id !== storeId));
+      }
+    } catch (e: any) { alert('❌ Error: ' + e.message); }
+    setIsActionLoading(false);
+  };
+
+  const handleToggleStore = async (store: any) => {
+    setIsActionLoading(true);
+    try {
+      const res = await fetch('/api/admin/stores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toggle', store })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStoresList(prev => prev.map(s => s.id === store.id ? data.store : s));
+      }
+    } catch (e: any) { alert('❌ Error: ' + e.message); }
+    setIsActionLoading(false);
+  };
+
   const testTelegramConfig = async () => {
     setIsActionLoading(true);
     try {
@@ -318,6 +405,7 @@ export function AdminModal() {
               { id: 'deals', label: 'Contenido', icon: LayoutGrid },
               { id: 'users', label: 'Usuarios', icon: UserMinus },
               { id: 'history', label: 'Log', icon: History },
+              { id: 'stores', label: 'Tiendas', icon: Store },
               { id: 'telegram', label: 'API', icon: Send },
             ].map((t) => (
               <button 
@@ -396,7 +484,10 @@ export function AdminModal() {
                            <div className="flex items-center gap-2">
                              <span className={`text-[9px] font-numbers font-black text-green-500`}>{deal.price}€</span>
                              {deal.old_price && <span className={`text-[9px] font-numbers line-through ${tc.muted}`}>{deal.old_price}€</span>}
-                             <span className={`text-[9px] ${tc.muted}`}>· @{deal.profiles?.username} · {deal.store}</span>
+                             <span className={`text-[9px] ${tc.muted}`}>· @{deal.profiles?.username} · </span>
+                             <span className={`${getStoreStyles(deal.store, isDarkMode).bg} ${getStoreStyles(deal.store, isDarkMode).text} ${getStoreStyles(deal.store, isDarkMode).border} text-[8px] font-heading font-black px-1.5 py-0.5 rounded border uppercase inline-block`}>
+                               {deal.store}
+                             </span>
                            </div>
                         </div>
                         {/* Acciones */}
@@ -417,7 +508,8 @@ export function AdminModal() {
                              <TelegramIcon className="w-3.5 h-3.5" />
                            </button>
                            <button onClick={() => handleModerationAction([deal.id], 'approve')} title="Aprobar" className="p-2 bg-green-500/10 text-green-500 rounded-lg hover:bg-green-500/20 transition-colors"><Check className="w-3.5 h-3.5" /></button>
-                           <button onClick={() => handleModerationAction([deal.id], 'reject')} title="Rechazar" className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors"><Ban className="w-3.5 h-3.5" /></button>
+                           <button onClick={() => handleModerationAction([deal.id], 'reject')} title="Rechazar" className="p-2 bg-orange-500/10 text-orange-500 rounded-lg hover:bg-orange-500/20 transition-colors"><Ban className="w-3.5 h-3.5" /></button>
+                           <button onClick={() => { if(confirm('¿Borrar permanentemente?')) handleModerationAction([deal.id], 'delete') }} title="Eliminar" className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
                      </div>
                   ))}
@@ -436,7 +528,10 @@ export function AdminModal() {
                            <div className="flex items-center gap-2">
                              <span className={`text-[9px] font-numbers font-black text-green-500`}>{deal.price}€</span>
                              {deal.old_price && <span className={`text-[9px] font-numbers line-through ${tc.muted}`}>{deal.old_price}€</span>}
-                             <span className={`text-[9px] ${tc.muted}`}>· {deal.store} · <span className="uppercase font-black">{deal.status}</span></span>
+                             <span className={`${getStoreStyles(deal.store, isDarkMode).bg} ${getStoreStyles(deal.store, isDarkMode).text} ${getStoreStyles(deal.store, isDarkMode).border} text-[8px] font-heading font-black px-1.5 py-0.5 rounded border uppercase inline-block`}>
+                               {deal.store}
+                             </span>
+                             <span className={`text-[9px] ${tc.muted}`}> · <span className="uppercase font-black">{deal.status}</span></span>
                            </div>
                         </div>
                         <div className="flex gap-1.5 shrink-0">
@@ -450,8 +545,15 @@ export function AdminModal() {
                            >
                              <TelegramIcon className="w-3.5 h-3.5" />
                            </button>
-                           <button onClick={() => handleModerationAction([deal.id], deal.status === 'approved' ? 'reject' : 'approve')} className={`p-2 rounded-lg ${deal.status === 'approved' ? 'text-red-500 bg-red-500/10' : 'text-green-500 bg-green-500/10'}`}>
+                           <button onClick={() => handleModerationAction([deal.id], deal.status === 'approved' ? 'reject' : 'approve')} title={deal.status === 'approved' ? 'Rechazar/Ocultar' : 'Aprobar'} className={`p-2 rounded-lg ${deal.status === 'approved' ? 'text-orange-500 bg-orange-500/10' : 'text-green-500 bg-green-500/10'}`}>
                              {deal.status === 'approved' ? <Ban className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
+                           </button>
+                           <button 
+                             onClick={() => { if(confirm('¿Eliminar permanentemente de la base de datos?')) handleModerationAction([deal.id], 'delete') }} 
+                             title="Borrar definitivamente"
+                             className="p-2 rounded-lg text-red-500 bg-red-500/10 hover:bg-red-500/20"
+                           >
+                             <Trash2 className="w-3.5 h-3.5" />
                            </button>
                         </div>
                      </div>
@@ -545,6 +647,306 @@ export function AdminModal() {
                 </div>
               )}
 
+              {tab === 'stores' && (
+                <div className="space-y-6">
+                  {/* Create New Store Form */}
+                  <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-slate-50 border-slate-100'}`}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-[#009ea8]/10 flex items-center justify-center text-[#009ea8] border border-[#009ea8]/10">
+                        <Plus className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-heading font-black">Nueva Tienda Oficial</h3>
+                        <p className={`text-[9px] font-numbers font-bold ${tc.muted}`}>Define nombre, colores y logo</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className={`text-[9px] font-bold uppercase tracking-wider ml-1 mb-1 block ${tc.muted}`}>Nombre *</label>
+                        <input 
+                          type="text" 
+                          value={newStore.name} 
+                          onChange={e => setNewStore({...newStore, name: e.target.value})} 
+                          placeholder="Ej: Amazon" 
+                          className={`w-full p-2.5 rounded-xl text-xs border-none shadow-inner ${tc.input}`} 
+                        />
+                      </div>
+                      <div>
+                        <label className={`text-[9px] font-bold uppercase tracking-wider ml-1 mb-1 block ${tc.muted}`}>URL del Logo (circular)</label>
+                        <input 
+                          type="text" 
+                          value={newStore.logo_url} 
+                          onChange={e => setNewStore({...newStore, logo_url: e.target.value})} 
+                          placeholder="https://..." 
+                          className={`w-full p-2.5 rounded-xl text-xs border-none shadow-inner ${tc.input}`} 
+                        />
+                      </div>
+                      <div>
+                        <label className={`text-[9px] font-bold uppercase tracking-wider ml-1 mb-1 block ${tc.muted}`}>Color Principal</label>
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="color" 
+                            value={newStore.color_primary} 
+                            onChange={e => setNewStore({...newStore, color_primary: e.target.value})} 
+                            className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent" 
+                          />
+                          <input 
+                            type="text" 
+                            value={newStore.color_primary} 
+                            onChange={e => setNewStore({...newStore, color_primary: e.target.value})} 
+                            className={`flex-1 p-2.5 rounded-xl text-xs border-none shadow-inner font-mono ${tc.input}`} 
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className={`text-[9px] font-bold uppercase tracking-wider ml-1 mb-1 block ${tc.muted}`}>Color Secundario</label>
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="color" 
+                            value={newStore.color_secondary || '#000000'} 
+                            onChange={e => setNewStore({...newStore, color_secondary: e.target.value})} 
+                            className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent" 
+                          />
+                          <input 
+                            type="text" 
+                            value={newStore.color_secondary} 
+                            onChange={e => setNewStore({...newStore, color_secondary: e.target.value})} 
+                            placeholder="Opcional" 
+                            className={`flex-1 p-2.5 rounded-xl text-xs border-none shadow-inner font-mono ${tc.input}`} 
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className={`text-[9px] font-bold uppercase tracking-wider ml-1 mb-1 block ${tc.muted}`}>Color del Texto</label>
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="color" 
+                            value={newStore.color_text} 
+                            onChange={e => setNewStore({...newStore, color_text: e.target.value})} 
+                            className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent" 
+                          />
+                          <input 
+                            type="text" 
+                            value={newStore.color_text} 
+                            onChange={e => setNewStore({...newStore, color_text: e.target.value})} 
+                            className={`flex-1 p-2.5 rounded-xl text-xs border-none shadow-inner font-mono ${tc.input}`} 
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className={`text-[9px] font-bold uppercase tracking-wider ml-1 mb-1 block ${tc.muted}`}>Color del Borde</label>
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="color" 
+                            value={newStore.color_border || '#000000'} 
+                            onChange={e => setNewStore({...newStore, color_border: e.target.value})} 
+                            className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent" 
+                          />
+                          <input 
+                            type="text" 
+                            value={newStore.color_border} 
+                            onChange={e => setNewStore({...newStore, color_border: e.target.value})} 
+                            placeholder="Opcional" 
+                            className={`flex-1 p-2.5 rounded-xl text-xs border-none shadow-inner font-mono ${tc.input}`} 
+                          />
+                        </div>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className={`text-[9px] font-bold uppercase tracking-wider ml-1 mb-1 block ${tc.muted}`}>Descripción</label>
+                        <input 
+                          type="text" 
+                          value={newStore.description} 
+                          onChange={e => setNewStore({...newStore, description: e.target.value})} 
+                          placeholder="Breve descripción de la tienda" 
+                          className={`w-full p-2.5 rounded-xl text-xs border-none shadow-inner ${tc.input}`} 
+                        />
+                      </div>
+                    </div>
+
+                    {/* Live Preview */}
+                    <div className="mt-4 flex items-center gap-4">
+                      <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider ${tc.muted}`}>
+                        <Eye className="w-3 h-3" /> Vista previa:
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div 
+                          className="w-8 h-8 rounded-full flex items-center justify-center border-2 overflow-hidden shadow-md"
+                          style={{ 
+                            borderColor: newStore.color_primary, 
+                            backgroundColor: newStore.logo_url ? 'white' : newStore.color_primary 
+                          }}
+                        >
+                          {newStore.logo_url ? (
+                            <img src={newStore.logo_url} alt="" className="w-full h-full object-cover rounded-full" />
+                          ) : (
+                            <span className="text-[10px] font-black" style={{ color: newStore.color_text }}>
+                              {newStore.name.charAt(0) || '?'}
+                            </span>
+                          )}
+                        </div>
+                        <span 
+                          className="px-2 py-1 rounded border text-[10px] font-heading font-black uppercase shadow-sm"
+                          style={{ 
+                            backgroundColor: newStore.color_primary, 
+                            color: newStore.color_text, 
+                            borderColor: newStore.color_border || newStore.color_primary 
+                          }}
+                        >
+                          {newStore.name || 'TIENDA'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={handleCreateStore} 
+                      disabled={isActionLoading || !newStore.name.trim()}
+                      className="mt-4 w-full py-3 bg-[#009ea8] text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-[#009ea8]/20 hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-50"
+                    >
+                      {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Crear Tienda Oficial'}
+                    </button>
+                  </div>
+
+                  {/* Existing Stores List */}
+                  <div className="space-y-3">
+                    <p className={`text-[10px] font-black uppercase tracking-widest ${tc.muted}`}>
+                      {storesList.length} tiendas registradas
+                    </p>
+                    {storesList.map(store => (
+                      <div 
+                        key={store.id} 
+                        className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center gap-4 transition-all ${tc.item}`}
+                        style={{ borderLeftWidth: '3px', borderLeftColor: store.color_primary }}
+                      >
+                        {/* Store Logo + Info */}
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div 
+                            className="w-10 h-10 rounded-full flex items-center justify-center border-2 overflow-hidden shadow-md shrink-0"
+                            style={{ 
+                              borderColor: store.color_primary, 
+                              backgroundColor: store.logo_url ? 'white' : store.color_primary 
+                            }}
+                          >
+                            {store.logo_url ? (
+                              <img src={store.logo_url} alt="" className="w-full h-full object-cover rounded-full" />
+                            ) : (
+                              <span className="text-xs font-black" style={{ color: store.color_text }}>
+                                {store.name.charAt(0)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-heading font-bold truncate">{store.name}</h4>
+                              {!store.is_active && (
+                                <span className="px-1.5 py-0.5 rounded text-[7px] font-black uppercase bg-red-500/10 text-red-500">Inactiva</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span 
+                                className="px-1.5 py-0.5 rounded text-[8px] font-heading font-black uppercase border shadow-sm"
+                                style={{ 
+                                  backgroundColor: store.color_primary, 
+                                  color: store.color_text, 
+                                  borderColor: store.color_border || store.color_primary 
+                                }}
+                              >
+                                {store.name}
+                              </span>
+                              {/* Color swatches */}
+                              <div className="flex gap-1">
+                                <div className="w-3 h-3 rounded-full border border-white/20 shadow-sm" style={{ backgroundColor: store.color_primary }} title="Primario" />
+                                {store.color_secondary && <div className="w-3 h-3 rounded-full border border-white/20 shadow-sm" style={{ backgroundColor: store.color_secondary }} title="Secundario" />}
+                              </div>
+                              <span className={`text-[8px] ${tc.muted}`}>
+                                · {store.deal_count || 0} ofertas · /{store.slug}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-1.5 shrink-0">
+                          <button 
+                            onClick={() => setEditingStore(editingStore?.id === store.id ? null : {...store})} 
+                            title="Editar" 
+                            className={`p-2 rounded-lg transition-colors ${isDarkMode ? 'bg-white/5 hover:bg-white/10 text-gray-400' : 'bg-slate-100 hover:bg-slate-200 text-slate-500'}`}
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button 
+                            onClick={() => handleToggleStore(store)} 
+                            title={store.is_active ? 'Desactivar' : 'Activar'}
+                            className={`p-2 rounded-lg transition-colors ${store.is_active ? 'bg-green-500/10 text-green-500 hover:bg-green-500/20' : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'}`}
+                          >
+                            <Power className="w-3.5 h-3.5" />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteStore(store.id)} 
+                            title="Eliminar" 
+                            className="p-2 rounded-lg text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Inline Edit Form */}
+                        {editingStore?.id === store.id && (
+                          <div className={`w-full p-4 mt-2 rounded-xl border ${isDarkMode ? 'bg-black/40 border-white/5' : 'bg-white border-slate-100'} animate-in slide-in-from-top-2 duration-200`}>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className={`text-[9px] font-bold uppercase tracking-wider ml-1 mb-1 block ${tc.muted}`}>Nombre</label>
+                                <input type="text" value={editingStore.name} onChange={e => setEditingStore({...editingStore, name: e.target.value})} className={`w-full p-2 rounded-lg text-xs ${tc.input}`} />
+                              </div>
+                              <div>
+                                <label className={`text-[9px] font-bold uppercase tracking-wider ml-1 mb-1 block ${tc.muted}`}>Logo URL</label>
+                                <input type="text" value={editingStore.logo_url || ''} onChange={e => setEditingStore({...editingStore, logo_url: e.target.value})} className={`w-full p-2 rounded-lg text-xs ${tc.input}`} />
+                              </div>
+                              <div>
+                                <label className={`text-[9px] font-bold uppercase tracking-wider ml-1 mb-1 block ${tc.muted}`}>Color Principal</label>
+                                <div className="flex items-center gap-2">
+                                  <input type="color" value={editingStore.color_primary} onChange={e => setEditingStore({...editingStore, color_primary: e.target.value})} className="w-7 h-7 rounded cursor-pointer border-0" />
+                                  <input type="text" value={editingStore.color_primary} onChange={e => setEditingStore({...editingStore, color_primary: e.target.value})} className={`flex-1 p-2 rounded-lg text-xs font-mono ${tc.input}`} />
+                                </div>
+                              </div>
+                              <div>
+                                <label className={`text-[9px] font-bold uppercase tracking-wider ml-1 mb-1 block ${tc.muted}`}>Color Texto</label>
+                                <div className="flex items-center gap-2">
+                                  <input type="color" value={editingStore.color_text} onChange={e => setEditingStore({...editingStore, color_text: e.target.value})} className="w-7 h-7 rounded cursor-pointer border-0" />
+                                  <input type="text" value={editingStore.color_text} onChange={e => setEditingStore({...editingStore, color_text: e.target.value})} className={`flex-1 p-2 rounded-lg text-xs font-mono ${tc.input}`} />
+                                </div>
+                              </div>
+                              <div>
+                                <label className={`text-[9px] font-bold uppercase tracking-wider ml-1 mb-1 block ${tc.muted}`}>Descripción</label>
+                                <input type="text" value={editingStore.description || ''} onChange={e => setEditingStore({...editingStore, description: e.target.value})} className={`w-full p-2 rounded-lg text-xs ${tc.input}`} />
+                              </div>
+                              <div>
+                                <label className={`text-[9px] font-bold uppercase tracking-wider ml-1 mb-1 block ${tc.muted}`}>Website</label>
+                                <input type="text" value={editingStore.website_url || ''} onChange={e => setEditingStore({...editingStore, website_url: e.target.value})} className={`w-full p-2 rounded-lg text-xs ${tc.input}`} />
+                              </div>
+                            </div>
+                            <div className="flex gap-2 mt-3">
+                              <button 
+                                onClick={() => setEditingStore(null)} 
+                                className={`flex-1 py-2 rounded-lg text-xs font-black uppercase ${isDarkMode ? 'bg-white/5 text-gray-400' : 'bg-slate-100 text-slate-500'}`}
+                              >
+                                Cancelar
+                              </button>
+                              <button 
+                                onClick={() => handleUpdateStore(editingStore)}
+                                disabled={isActionLoading}
+                                className="flex-1 py-2 bg-[#009ea8] text-white rounded-lg text-xs font-black uppercase shadow-lg shadow-[#009ea8]/20 disabled:opacity-50"
+                              >
+                                Guardar Cambios
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {tab === 'telegram' && (
                 <div className="max-w-md mx-auto space-y-4 py-5">
                    <div className="text-center mb-6">

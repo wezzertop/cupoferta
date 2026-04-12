@@ -119,3 +119,199 @@ export function getHighResImageUrl(url: string | null | undefined): string {
 
   return url;
 }
+
+// --- Cookie Helpers ---
+export function setCookie(name: string, value: string, days: number) {
+  if (typeof document === 'undefined') return;
+  let expires = "";
+  if (days) {
+    const date = new Date();
+    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+    expires = "; expires=" + date.toUTCString();
+  }
+  document.cookie = name + "=" + (value || "") + expires + "; path=/";
+}
+
+export function getCookie(name: string) {
+  if (typeof document === 'undefined') return null;
+  const nameEQ = name + "=";
+  const ca = document.cookie.split(';');
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+  }
+  return null;
+}
+
+// --- Preference Tracking ---
+export function updatePreferences(category: string) {
+  if (!category || typeof document === 'undefined') return;
+  
+  // Only track if user has given consent
+  const consent = getCookie('cookie_consent');
+  if (consent !== 'true') return;
+
+  const prefsStr = getCookie('user_preferences');
+  let prefs: string[] = [];
+  
+  if (prefsStr) {
+    try {
+      prefs = JSON.parse(prefsStr);
+    } catch (e) {
+      prefs = [];
+    }
+  }
+
+  // Add category if not already in recent (keep last 5)
+  prefs = prefs.filter(p => p !== category);
+  prefs.unshift(category);
+  prefs = prefs.slice(0, 5);
+
+
+  setCookie('user_preferences', JSON.stringify(prefs), 365);
+}
+
+// --- Store Custom Branding ---
+// Accepts optional officialStores array from the Zustand cache for dynamic matching.
+export function getStoreStyles(
+  storeName: string | null | undefined, 
+  isDarkMode: boolean, 
+  officialStores?: any[]
+): { bg: string; text: string; border: string } {
+  const store = (storeName || '').toLowerCase().trim();
+  
+  // 1. Try dynamic match from official stores cache first
+  if (officialStores && officialStores.length > 0) {
+    const match = officialStores.find(s => {
+      const sName = (s.name || '').toLowerCase();
+      const sSlug = (s.slug || '').toLowerCase();
+      return store.includes(sName) || store.includes(sSlug) || sName.includes(store);
+    });
+    
+    if (match) {
+      return {
+        bg: `bg-[${match.color_primary}]`,
+        text: `text-[${match.color_text}]`,
+        border: `border-[${match.color_border || match.color_primary}]`,
+      };
+    }
+  }
+  
+  // 2. Hardcoded fallback themes (guarantees styling even without DB)
+  const themes: Record<string, { bg: string, text: string, border: string }> = {
+    'amazon': { 
+      bg: 'bg-[#FF9900]', 
+      text: 'text-black', 
+      border: 'border-[#e68a00]' 
+    },
+    'mercado libre': { 
+      bg: 'bg-[#FFE600]', 
+      text: 'text-black', 
+      border: 'border-[#d4bf00]' 
+    },
+    'tiktok': { 
+      bg: isDarkMode ? 'bg-white' : 'bg-black', 
+      text: isDarkMode ? 'text-black' : 'text-white', 
+      border: isDarkMode ? 'border-white' : 'border-black' 
+    },
+    'aliexpress': { 
+      bg: 'bg-[#E62E04]', 
+      text: 'text-white', 
+      border: 'border-[#b52403]' 
+    },
+    'miravia': { 
+      bg: 'bg-[#FF004C]', 
+      text: 'text-white', 
+      border: 'border-[#cc003d]' 
+    },
+    'temu': { 
+      bg: 'bg-[#FF6000]', 
+      text: 'text-white', 
+      border: 'border-[#cc4d00]' 
+    },
+    'walmart': { 
+      bg: 'bg-[#0071CE]', 
+      text: 'text-white', 
+      border: 'border-[#005ba6]' 
+    },
+    'pccomponentes': { 
+      bg: 'bg-[#FF6000]', 
+      text: 'text-white', 
+      border: 'border-[#cc4d00]' 
+    },
+    'samsung': { 
+      bg: 'bg-[#1428A0]', 
+      text: 'text-white', 
+      border: 'border-[#102080]' 
+    },
+    'apple': { 
+      bg: isDarkMode ? 'bg-white/20' : 'bg-slate-200', 
+      text: isDarkMode ? 'text-white' : 'text-slate-900', 
+      border: isDarkMode ? 'border-white/10' : 'border-slate-300' 
+    },
+    'nike': { 
+      bg: isDarkMode ? 'bg-white' : 'bg-black', 
+      text: isDarkMode ? 'text-black' : 'text-white', 
+      border: isDarkMode ? 'border-white' : 'border-black' 
+    },
+    'adidas': { 
+      bg: isDarkMode ? 'bg-white' : 'bg-black', 
+      text: isDarkMode ? 'text-black' : 'text-white', 
+      border: isDarkMode ? 'border-white' : 'border-black' 
+    },
+    'shein': { 
+      bg: 'bg-black', 
+      text: 'text-white', 
+      border: 'border-black' 
+    }
+  };
+
+  if (store.includes('amazon')) return themes['amazon'];
+  if (store.includes('mercado libre') || store.includes('mercadolibre')) return themes['mercado libre'];
+  if (store.includes('tiktok')) return themes['tiktok'];
+  if (store.includes('aliexpress')) return themes['aliexpress'];
+  if (store.includes('miravia')) return themes['miravia'];
+  if (store.includes('temu')) return themes['temu'];
+  if (store.includes('walmart')) return themes['walmart'];
+  if (store.includes('pccomponentes')) return themes['pccomponentes'];
+  if (store.includes('samsung')) return themes['samsung'];
+  if (store.includes('apple')) return themes['apple'];
+  if (store.includes('nike')) return themes['nike'];
+  if (store.includes('adidas')) return themes['adidas'];
+  if (store.includes('shein')) return themes['shein'];
+
+  return { 
+    bg: isDarkMode ? 'bg-white/10' : 'bg-white/90', 
+    text: isDarkMode ? 'text-white' : 'text-[#111727]', 
+    border: isDarkMode ? 'border-white/10' : 'border-slate-200' 
+  };
+}
+
+/**
+ * Returns inline style object for store branding from official store data.
+ * Use this instead of Tailwind classes for dynamically generated colors.
+ */
+export function getStoreInlineStyles(
+  storeName: string | null | undefined,
+  officialStores: any[]
+): { backgroundColor: string; color: string; borderColor: string } | null {
+  const store = (storeName || '').toLowerCase().trim();
+  
+  const match = officialStores.find(s => {
+    const sName = (s.name || '').toLowerCase();
+    const sSlug = (s.slug || '').toLowerCase();
+    return store.includes(sName) || store.includes(sSlug) || sName.includes(store);
+  });
+  
+  if (match) {
+    return {
+      backgroundColor: match.color_primary,
+      color: match.color_text,
+      borderColor: match.color_border || match.color_primary,
+    };
+  }
+  
+  return null;
+}
+

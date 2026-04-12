@@ -56,12 +56,20 @@ interface UIStore {
   setDealComment: (dealId: string, comments: number) => void;
   
   // Real-time Feed Filters
-  activeFilter: 'home' | 'saved' | 'profile' | 'category';
-  setActiveFilter: (filter: 'home' | 'saved' | 'profile' | 'category') => void;
+  activeFilter: 'home' | 'saved' | 'profile' | 'category' | 'store';
+  setActiveFilter: (filter: 'home' | 'saved' | 'profile' | 'category' | 'store') => void;
   categoryFilter: string | null;
   setCategoryFilter: (category: string | null) => void;
-  activeTab: 'hot' | 'new' | 'commented' | 'coupons';
-  setActiveTab: (tab: 'hot' | 'new' | 'commented' | 'coupons') => void;
+  storeFilter: string | null;
+  setStoreFilter: (store: string | null) => void;
+  activeTab: 'hot' | 'new' | 'commented' | 'coupons' | 'recommended' | 'stores';
+  setActiveTab: (tab: 'hot' | 'new' | 'commented' | 'coupons' | 'recommended' | 'stores') => void;
+  hasConsent: boolean;
+  setHasConsent: (has: boolean) => void;
+  
+  // Official Stores Cache
+  officialStores: any[];
+  setOfficialStores: (stores: any[]) => void;
 }
 
 export const useUIStore = create<UIStore>()(
@@ -130,8 +138,15 @@ export const useUIStore = create<UIStore>()(
   setActiveFilter: (filter) => set({ activeFilter: filter }),
   categoryFilter: null,
   setCategoryFilter: (category) => set({ categoryFilter: category }),
+  storeFilter: null,
+  setStoreFilter: (store) => set({ storeFilter: store }),
   activeTab: 'hot',
   setActiveTab: (tab) => set({ activeTab: tab }),
+  hasConsent: false,
+  setHasConsent: (has) => set({ hasConsent: has }),
+  
+  officialStores: [],
+  setOfficialStores: (stores) => set({ officialStores: stores }),
     }),
     {
       name: 'cupoferta-storage',

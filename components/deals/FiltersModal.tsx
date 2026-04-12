@@ -1,15 +1,35 @@
 'use client';
 import { useUIStore } from '@/lib/store';
-import { X, SlidersHorizontal, Sparkles, Tag, ShoppingBag, Flame, DollarSign, RotateCcw, Search, Zap, Star } from 'lucide-react';
-import { useState } from 'react';
+import { X, SlidersHorizontal, Sparkles, Tag, ShoppingBag, Flame, DollarSign, RotateCcw, Search, Zap, Star, Store } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { getStoreInlineStyles } from '@/lib/utils';
 
 export function FiltersModal() {
-  const { filtersModalOpen, setFiltersModalOpen, isDarkMode, setActiveFilter, setCategoryFilter } = useUIStore();
+  const { filtersModalOpen, setFiltersModalOpen, isDarkMode, activeFilter, setActiveFilter, categoryFilter, setCategoryFilter, storeFilter, setStoreFilter, officialStores, setOfficialStores } = useUIStore();
   const [tempMin, setTempMin] = useState(0);
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedStores, setSelectedStores] = useState<string[]>([]);
+  const [selectedStore, setSelectedStore] = useState<string | null>(null);
+
+  // Sync local state with global filters when modal opens
+  useEffect(() => {
+    if (filtersModalOpen) {
+      setSelectedStore(storeFilter);
+      setSelectedCategory(categoryFilter);
+      
+      if (officialStores.length === 0) {
+        fetch('/api/admin/stores')
+          .then(r => r.json())
+          .then(data => {
+            if (data.success && data.stores) {
+              setOfficialStores(data.stores);
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, [filtersModalOpen]);
 
   if (!filtersModalOpen) return null;
 
@@ -23,21 +43,23 @@ export function FiltersModal() {
   };
 
   const categories = ['Electrónica', 'Videojuegos', 'Moda', 'Hogar', 'Supermercado', 'Viajes', 'Restaurantes'];
-  const stores = ['Amazon', 'AliExpress', 'Mercado Libre', 'Walmart', 'Nike', 'Steam', 'Samsung'];
 
   const handleApply = () => {
-    if (selectedCategory) {
-      setCategoryFilter(selectedCategory);
+    // Si tenemos filtros específicos, cambiamos el activeFilter a algo que los represente o simplemente 'home'
+    // ya que fetchDeals ahora aplica categoryFilter y storeFilter independientemente de activeFilter (si no es profile/saved)
+    
+    setStoreFilter(selectedStore);
+    setCategoryFilter(selectedCategory);
+
+    if (selectedStore) {
+      setActiveFilter('store');
+    } else if (selectedCategory) {
       setActiveFilter('category');
     } else {
       setActiveFilter('home');
-      setCategoryFilter(null);
     }
+    
     setFiltersModalOpen(false);
-  };
-
-  const toggleStore = (store: string) => {
-    setSelectedStores(prev => prev.includes(store) ? prev.filter(s => s !== store) : [...prev, store]);
   };
 
   return (
@@ -84,7 +106,7 @@ export function FiltersModal() {
             <p className={tc.label}><Tag className="w-3 h-3" /> Categorías</p>
             <div className="flex flex-wrap gap-2">
               <button 
-                onClick={() => setSelectedCategory(null)}
+                onClick={() => { setSelectedCategory(null); }}
                 className={tc.chip(!selectedCategory)}
               >
                 Todas
@@ -92,7 +114,7 @@ export function FiltersModal() {
               {categories.map(cat => (
                 <button 
                   key={cat} 
-                  onClick={() => setSelectedCategory(cat)}
+                  onClick={() => { setSelectedCategory(cat); }}
                   className={tc.chip(selectedCategory === cat)}
                 >
                   {cat}
@@ -129,21 +151,80 @@ export function FiltersModal() {
             </div>
           </div>
 
-          {/* Stores */}
+          {/* Official Stores — Dynamic with logos and brand colors */}
           <div className={tc.section}>
-            <p className={tc.label}><ShoppingBag className="w-3 h-3" /> Tiendas populares</p>
+            <p className={tc.label}><Store className="w-3 h-3" /> Tiendas Oficiales</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {stores.map(store => (
-                <button 
-                  key={store}
-                  onClick={() => toggleStore(store)}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all text-left group ${selectedStores.includes(store) ? 'bg-[#009ea8]/10 border-[#009ea8] text-[#009ea8]' : isDarkMode ? 'bg-[#111] border-[#262626] text-gray-400 hover:border-gray-600' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'}`}
-                >
-                  <div className={`w-2 h-2 rounded-full border transition-all ${selectedStores.includes(store) ? 'bg-[#009ea8] border-[#009ea8]' : 'bg-transparent border-gray-500'}`} />
-                  <span className="text-[13px] font-heading font-bold">{store}</span>
-                </button>
-              ))}
+              {officialStores.map(store => {
+                const isSelected = selectedStore === store.name;
+                return (
+                  <button 
+                    key={store.id}
+                    onClick={() => { 
+                      setSelectedStore(isSelected ? null : store.name); 
+                    }}
+                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all text-left group relative overflow-hidden ${
+                      isSelected 
+                        ? 'shadow-lg scale-[1.02]' 
+                        : isDarkMode 
+                          ? 'bg-[#111] border-[#262626] text-gray-400 hover:border-gray-500' 
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
+                    style={isSelected ? {
+                      backgroundColor: store.color_primary + '20',
+                      borderColor: store.color_primary,
+                      color: isDarkMode ? '#fff' : store.color_primary,
+                    } : {}}
+                  >
+                    {/* Store Logo Circle */}
+                    <div 
+                      className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 border-2 overflow-hidden shadow-sm transition-transform group-hover:scale-110"
+                      style={{
+                        borderColor: store.color_primary,
+                        backgroundColor: store.logo_url ? 'white' : store.color_primary,
+                      }}
+                    >
+                      {store.logo_url ? (
+                        <img 
+                          src={store.logo_url} 
+                          alt={store.name} 
+                          className="w-full h-full object-cover rounded-full" 
+                        />
+                      ) : (
+                        <span 
+                          className="text-[9px] font-black"
+                          style={{ color: store.color_text }}
+                        >
+                          {store.name.charAt(0)}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Store Name */}
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[12px] font-heading font-bold truncate block">{store.name}</span>
+                      {store.deal_count > 0 && (
+                        <span className={`text-[9px] font-numbers font-bold ${isDarkMode ? 'text-gray-500' : 'text-slate-400'}`}>
+                          {store.deal_count} ofertas
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Color indicator dot */}
+                    <div 
+                      className="w-2 h-2 rounded-full shrink-0 transition-all"
+                      style={{ backgroundColor: store.color_primary }}
+                    />
+                  </button>
+                );
+              })}
             </div>
+            
+            {officialStores.length === 0 && (
+              <div className={`text-center py-4 text-[11px] font-heading ${isDarkMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                Cargando tiendas...
+              </div>
+            )}
           </div>
 
           {/* Temperature */}
@@ -178,7 +259,7 @@ export function FiltersModal() {
               setPriceMin('');
               setPriceMax('');
               setSelectedCategory(null);
-              setSelectedStores([]);
+              setSelectedStore(null);
             }}
             className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-heading font-bold text-[13px] transition-all active:scale-95 ${isDarkMode ? 'bg-[#222] text-gray-400 hover:bg-[#333]' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}
           >

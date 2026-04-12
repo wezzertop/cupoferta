@@ -3,7 +3,7 @@ import { useUIStore } from '@/lib/store';
 import { ChevronUp, ChevronDown, MessageCircle, Eye, Share2, Bookmark, ExternalLink, Truck, AlertTriangle, Flame, CheckCircle2, Tag, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { getDealImages, getRemainingTime, formatPrice, getCurrencyFlag, getFlagUrl } from '@/lib/utils';
+import { getDealImages, getRemainingTime, formatPrice, getCurrencyFlag, getFlagUrl, updatePreferences, getStoreStyles, getStoreInlineStyles } from '@/lib/utils';
 
 interface Deal {
   id: string;
@@ -22,6 +22,7 @@ interface Deal {
   created_at: string;
   expires_at: string | null;
   currency?: string;
+  category?: string;
   deal_type?: 'offer' | 'coupon';
   coupon_code?: string | null;
   profiles: { username: string; avatar_url: string };
@@ -65,7 +66,7 @@ export function DealCard({ deal, viewMode }: { deal: Deal; viewMode: 'grid' | 'l
   };
 
   const supabase = createClient();
-  const { user, setAuthModalOpen, dealTemps, setDealTemp, dealVotes, setDealVote, savedDeals, setSavedDeal, dealViews, setDealView, dealComments, setDealComment } = useUIStore();
+  const { user, setAuthModalOpen, dealTemps, setDealTemp, dealVotes, setDealVote, savedDeals, setSavedDeal, dealViews, setDealView, dealComments, setDealComment, officialStores } = useUIStore();
 
   const localTemp = dealTemps[deal.id] ?? deal.temp;
   const userVote = dealVotes[deal.id] ?? null;
@@ -160,6 +161,9 @@ export function DealCard({ deal, viewMode }: { deal: Deal; viewMode: 'grid' | 'l
   const openDrawer = (mode: 'details' | 'chat' | 'metrics') => {
     setSelectedDeal(deal);
     setDrawerMode(mode);
+    if (deal.category) {
+      updatePreferences(deal.category);
+    }
   };
 
   const handleCopyCoupon = (e: React.MouseEvent) => {
@@ -236,9 +240,24 @@ export function DealCard({ deal, viewMode }: { deal: Deal; viewMode: 'grid' | 'l
               ))}
             </div>
           )}
-          <div className="absolute top-1.5 left-1.5 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 rounded-lg text-[7px] sm:text-[9px] font-heading font-black uppercase tracking-wider text-[#111727] shadow-sm border border-slate-200/60">
-            {deal.store}
-          </div>
+          {(() => {
+            const inlineStyle = getStoreInlineStyles(deal.store, officialStores);
+            if (inlineStyle) {
+              return (
+                <div 
+                  className="absolute top-1.5 left-1.5 backdrop-blur-sm px-1.5 py-0.5 rounded-lg text-[7px] sm:text-[9px] font-heading font-black uppercase tracking-wider shadow-sm border"
+                  style={inlineStyle}
+                >
+                  {deal.store}
+                </div>
+              );
+            }
+            return (
+              <div className={`absolute top-1.5 left-1.5 backdrop-blur-sm px-1.5 py-0.5 rounded-lg text-[7px] sm:text-[9px] font-heading font-black uppercase tracking-wider shadow-sm border ${getStoreStyles(deal.store, isDarkMode).bg} ${getStoreStyles(deal.store, isDarkMode).text} ${getStoreStyles(deal.store, isDarkMode).border}`}>
+                {deal.store}
+              </div>
+            );
+          })()}
           <div className="absolute top-1.5 right-1.5 flex flex-col items-end gap-1">
             <div className={`bg-white/90 backdrop-blur-sm p-1 rounded-lg shadow-sm border border-slate-200/60 flex items-center justify-center`}>
               <img src={getFlagUrl(deal.currency)} alt="" className="w-5 h-auto rounded-sm shadow-[0_0_2px_rgba(0,0,0,0.1)]" />

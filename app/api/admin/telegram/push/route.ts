@@ -32,13 +32,14 @@ export async function POST(request: Request) {
     }
 
     // 1. Obtener configuración de Telegram
-    const { data: telConfig, error: telError } = await supabase
+    const { data: telConfig, error: telConfigError } = await supabase
       .from('telegram_config')
       .select('*')
       .limit(1)
       .maybeSingle();
 
-    if (telError || !telConfig || !telConfig.bot_token || !telConfig.channel_id) {
+    if (telConfigError || !telConfig || !telConfig.bot_token || !telConfig.channel_id) {
+      console.error('[Telegram Push] Config error or missing:', telConfigError, telConfig);
       return NextResponse.json({ error: 'Telegram is not configured' }, { status: 400 });
     }
 
@@ -50,25 +51,30 @@ export async function POST(request: Request) {
       .single();
 
     if (dealError || !deal) {
+      console.error('[Telegram Push] Deal not found:', dealId, dealError);
       return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
     }
 
+    console.log(`[Telegram Push] Sending deal: ${deal.title} (${deal.id})`);
+
     // 3. Preparar mensaje
     const escapeHtml = (text: string) =>
-      String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://cupoferta.com';
     const platformLink = `${siteUrl}/deal/${deal.id}`;
     let message = telConfig.message_template || '🔥 <b>{title}</b>\n💰 {flag} {price}\n\n📌 {store}\n\n<a href="{link}">Ver en tienda</a>';
 
-    message = message
-      .replace('{title}', escapeHtml(deal.title || ''))
-      .replace('{price}', escapeHtml(formatPrice(deal.price || 0, deal.currency)))
-      .replace('{old_price}', escapeHtml(formatPrice(deal.old_price || 0, deal.currency)))
-      .replace('{flag}', getCurrencyFlag(deal.currency))
-      .replace('{currency_code}', deal.currency || 'MXN')
-      .replace('{store}', escapeHtml(deal.store || ''))
-      .replace('{link}', deal.link || platformLink);
+    // Helper para reemplazar todos los placeholders
+    const replaceAll = (str: string, key: string, val: string) => str.split(key).join(val);
+
+    message = replaceAll(message, '{title}', escapeHtml(deal.title));
+    message = replaceAll(message, '{price}', escapeHtml(formatPrice(deal.price || 0, deal.currency)));
+    message = replaceAll(message, '{old_price}', escapeHtml(formatPrice(deal.old_price || 0, deal.currency)));
+    message = replaceAll(message, '{flag}', getCurrencyFlag(deal.currency));
+    message = replaceAll(message, '{currency_code}', deal.currency || 'MXN');
+    message = replaceAll(message, '{store}', escapeHtml(deal.store));
+    message = replaceAll(message, '{link}', escapeHtml(deal.link || platformLink));
 
     const inlineKeyboard = {
       inline_keyboard: [[
@@ -79,7 +85,7 @@ export async function POST(request: Request) {
 
     const rawImageUrl = getFirstImage(deal.image_url);
     const botBase = `https://api.telegram.org/bot${telConfig.bot_token}`;
-    let sent = false;
+    const silent = telConfig.silent_notifications !== false;
 
     // 4. Enviar imagen (binario)
     if (rawImageUrl) {
@@ -95,7 +101,7 @@ export async function POST(request: Request) {
           }
         } else if (rawImageUrl.startsWith('http')) {
           const optimizedUrl = getHighResImageUrl(rawImageUrl);
-          const imgFetch = await fetch(optimizedUrl, { signal: AbortSignal.timeout(15_000) });
+          const imgFetch = await fetch(optimizedUrl, { signal: AbortSignal.timeout(10000) });
           if (imgFetch.ok) {
             const arrayBuf = await imgFetch.arrayBuffer();
             imageBytes = new Uint8Array(arrayBuf);
@@ -109,18 +115,28 @@ export async function POST(request: Request) {
           telegramForm.append('parse_mode', 'HTML');
           telegramForm.append('caption', message);
           telegramForm.append('reply_markup', JSON.stringify(inlineKeyboard));
+          telegramForm.append('disable_notification', silent ? 'true' : 'false');
           telegramForm.append(
             'photo',
             new Blob([imageBytes as any], { type: contentType }),
             'deal_image.jpg'
           );
 
+          console.log('[Telegram Push] Sending photo...');
           const telRes = await fetch(`${botBase}/sendPhoto`, {
             method: 'POST',
             body: telegramForm,
           });
 
-          if (telRes.ok) sent = true;
+          if (telRes.ok) {
+            sent = true;
+            console.log('[Telegram Push] Photo sent successfully');
+          } else {
+            const errText = await telRes.text();
+            console.error('[Telegram Push] sendPhoto error:', errText);
+          }
+        } else {
+          console.warn('[Telegram Push] Could not get image bytes for:', rawImageUrl);
         }
       } catch (imgErr) {
         console.error('[Telegram Push] Image error:', imgErr);
@@ -129,6 +145,7 @@ export async function POST(request: Request) {
 
     // 5. Fallback a texto
     if (!sent) {
+      console.log('[Telegram Push] Sending text message fallback...');
       const telRes = await fetch(`${botBase}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -137,12 +154,21 @@ export async function POST(request: Request) {
           text: message,
           parse_mode: 'HTML',
           reply_markup: inlineKeyboard,
+          disable_notification: silent
         }),
       });
       if (!telRes.ok) {
         const errText = await telRes.text();
+        console.error('[Telegram Push] sendMessage error:', errText);
         return NextResponse.json({ error: 'Telegram API error', details: errText }, { status: 502 });
+      } else {
+        sent = true;
+        console.log('[Telegram Push] Text message sent successfully (fallback)');
       }
+    }
+
+    if (sent) {
+      await supabase.from('deals').update({ telegram_posted: true }).eq('id', deal.id);
     }
 
     return NextResponse.json({ success: true });
