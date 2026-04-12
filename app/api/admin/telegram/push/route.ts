@@ -57,6 +57,8 @@ export async function POST(request: Request) {
 
     console.log(`[Telegram Push] Sending deal: ${deal.title} (${deal.id})`);
 
+    let sent = false;
+
     // 3. Preparar mensaje
     const escapeHtml = (text: string) =>
       String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
