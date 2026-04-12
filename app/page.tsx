@@ -283,7 +283,7 @@ export default function Home() {
         query = supabase.from('deals').select('*, profiles!deals_user_id_fkey(username, avatar_url)');
 
         // Base filters for public views
-        if (activeFilter !== 'profile' && activeFilter !== 'saved') {
+        if (activeFilter !== 'profile') {
           query = query.eq('status', 'approved');
           query = query.or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
           
